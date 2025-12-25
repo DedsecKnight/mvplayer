@@ -10,11 +10,13 @@ include(${CMAKE_BINARY_DIR}/generators/conan_toolchain.cmake)
 
 find_package(ffmpeg REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(OpenCV REQUIRED)
 
 add_library(videoplayer)
 target_sources(videoplayer
   PRIVATE
     src/player.cpp
+    src/utils.cpp
 
   PUBLIC
     FILE_SET vplayerHeaders
@@ -24,7 +26,7 @@ target_sources(videoplayer
     FILES
       include/player.hpp
 )
-target_link_libraries(videoplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog)
+target_link_libraries(videoplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv)
 
 add_subdirectory(apps)
 

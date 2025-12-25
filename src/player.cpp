@@ -1,11 +1,9 @@
 #include "player.hpp"
 
-#include <libavcodec/avcodec.h>
-#include <libavcodec/codec_par.h>
-
 #include <filesystem>
 
 #include "info.hpp"
+#include "utils.hpp"
 
 extern "C" {
 #include <libavcodec/codec.h>
@@ -14,6 +12,8 @@ extern "C" {
 }
 
 #include <spdlog/spdlog.h>
+
+#include <opencv2/imgproc.hpp>
 
 namespace mvplayer {
 std::optional<VideoInfo> VideoPlayer::loadVideo(
@@ -52,6 +52,7 @@ std::optional<VideoInfo> VideoPlayer::loadVideo(
 
   return VideoInfo{pFormatContext_->iformat->long_name,
                    pCodec->long_name,
+                   (*videoStreamIt)->avg_frame_rate,
                    pCodecParams->bit_rate,
                    pFormatContext_->duration,
                    pCodecParams->width,
@@ -59,14 +60,31 @@ std::optional<VideoInfo> VideoPlayer::loadVideo(
 }
 
 std::optional<FrameInfo> VideoPlayer::getFrame() const noexcept {
-  AVPacket* pPacket = av_packet_alloc();
-  AVFrame* pFrame = av_frame_alloc();
-  if (av_read_frame(pFormatContext_, pPacket) < 0) {
+  std::unique_ptr<AVPacket, decltype(&utils::avPacketDeallocator)> pPacket{
+      av_packet_alloc(), utils::avPacketDeallocator};
+
+  std::unique_ptr<AVFrame, decltype(&utils::avFrameDeallocator)> pFrame{
+      av_frame_alloc(), utils::avFrameDeallocator};
+
+  if (av_read_frame(pFormatContext_, pPacket.get()) < 0) {
     return std::nullopt;
   }
-  avcodec_send_packet(pCodecContext_, pPacket);
-  avcodec_receive_frame(pCodecContext_, pFrame);
-  return FrameInfo{pFrame->pts, pFrame->pkt_dts};
+
+  avcodec_send_packet(pCodecContext_, pPacket.get());
+  avcodec_receive_frame(pCodecContext_, pFrame.get());
+
+  auto convertedFrame =
+      utils::convertFrame(pFrame.get(), AVPixelFormat::AV_PIX_FMT_RGB24);
+
+  cv::Mat frame(convertedFrame->height, convertedFrame->width, CV_8UC3);
+  std::memcpy(frame.data, convertedFrame->data[0],
+              frame.elemSize() * frame.total());
+  cv::cvtColor(frame, frame, cv::COLOR_RGB2BGR);
+
+  auto frameInfo =
+      FrameInfo{frame, pCodecContext_->frame_num, pFrame->pts, pFrame->pkt_dts};
+
+  return frameInfo;
 }
 
 std::span<AVStream*> VideoPlayer::getMediaStreams() const noexcept {

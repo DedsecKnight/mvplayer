@@ -9,9 +9,10 @@ class VideoPlayerRecipe(ConanFile):
     generators = "CMakeDeps"
 
     def requirements(self):
-        self.requires("ffmpeg/8.0.1")
+        self.requires("ffmpeg/7.1.3")
         self.requires("cli11/2.6.0")
         self.requires("spdlog/1.16.0")
+        self.requires("opencv/4.12.0")
 
     def configure(self):
         self.options["ffmpeg"].with_pulse = False
