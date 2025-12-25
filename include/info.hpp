@@ -9,4 +9,8 @@ struct VideoInfo {
   int64_t bitRate, duration;
   int32_t width, height;
 };
+
+struct FrameInfo {
+  int64_t pts, dts;
+};
 }  // namespace mvplayer

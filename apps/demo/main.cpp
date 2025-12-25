@@ -20,5 +20,11 @@ int main(int argc, char** argv) {
     spdlog::info("Detected video stream: resolution {} x {}. Bit rate: {}",
                  videoInfo->width, videoInfo->height, videoInfo->bitRate);
     spdlog::info("Video Codec: {}", videoInfo->codecName);
+
+    for (auto frameInfo = player.getFrame(); frameInfo.has_value();
+         frameInfo = player.getFrame()) {
+      spdlog::info("Received new frame: pts = {}; dts = {}", frameInfo->pts,
+                   frameInfo->dts);
+    }
   }
 }
