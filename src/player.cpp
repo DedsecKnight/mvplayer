@@ -20,15 +20,12 @@ std::optional<VideoInfo> VideoPlayer::loadVideo(
     return std::nullopt;
   }
 
-  if (avformat_find_stream_info(pFormatContext_, nullptr)) {
+  auto streams = mediaStreams();
+  if (streams.empty()) {
     spdlog::error("Error finding stream information for {}",
                   filename.filename().string());
     return std::nullopt;
   }
-
-  std::span<AVStream*> streams{
-      pFormatContext_->streams,
-      pFormatContext_->streams + pFormatContext_->nb_streams};
 
   auto videoStreamIt = std::ranges::find_if(streams, [](AVStream* stream) {
     return stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO;
@@ -49,6 +46,16 @@ std::optional<VideoInfo> VideoPlayer::loadVideo(
                    pFormatContext_->duration,
                    pCodecParams->width,
                    pCodecParams->height};
+}
+
+std::span<AVStream*> VideoPlayer::mediaStreams() const noexcept {
+  if (avformat_find_stream_info(pFormatContext_, nullptr)) {
+    return {};
+  }
+
+  return std::span<AVStream*>{
+      pFormatContext_->streams,
+      pFormatContext_->streams + pFormatContext_->nb_streams};
 }
 
 VideoPlayer::~VideoPlayer() noexcept {
