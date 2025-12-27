@@ -25,7 +25,7 @@ Renderer::Renderer(int32_t width, int32_t height, int32_t padding)
   }
   spdlog::trace("SDL Window created successfully");
 
-  renderer_ = SDL_CreateRenderer(window_, nullptr);
+  renderer_ = SDL_CreateRenderer(window_.get(), nullptr);
   if (renderer_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating renderer: {}", SDL_GetError())};
@@ -33,7 +33,7 @@ Renderer::Renderer(int32_t width, int32_t height, int32_t padding)
   spdlog::trace("SDL Renderer created successfully");
 
   texture_ =
-      SDL_CreateTexture(renderer_, SDL_PixelFormat::SDL_PIXELFORMAT_RGB24,
+      SDL_CreateTexture(renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_RGB24,
                         SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING,
                         paddedWidth, paddedHeight);
   if (texture_ == nullptr) {
@@ -44,8 +44,8 @@ Renderer::Renderer(int32_t width, int32_t height, int32_t padding)
 }
 
 bool Renderer::renderFrame(const cv::Mat& frame) const noexcept {
-  SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 0);
-  SDL_RenderClear(renderer_);
+  SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
+  SDL_RenderClear(renderer_.get());
 
   cv::Mat paddedFrame;
   cv::copyMakeBorder(frame, paddedFrame, padding_, padding_, padding_, padding_,
@@ -53,15 +53,15 @@ bool Renderer::renderFrame(const cv::Mat& frame) const noexcept {
 
   void* pixels;
   int pitch;
-  if (!SDL_LockTexture(texture_, nullptr, &pixels, &pitch)) {
+  if (!SDL_LockTexture(texture_.get(), nullptr, &pixels, &pitch)) {
     spdlog::error("Error creating texture: {}", SDL_GetError());
     return false;
   }
   std::memcpy(pixels, paddedFrame.data, frame.elemSize() * frame.total());
-  SDL_UnlockTexture(texture_);
+  SDL_UnlockTexture(texture_.get());
 
-  if (!SDL_RenderTexture(renderer_, texture_, nullptr, nullptr) ||
-      !SDL_RenderPresent(renderer_)) {
+  if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr, nullptr) ||
+      !SDL_RenderPresent(renderer_.get())) {
     spdlog::error("Error rendering frame: {}", SDL_GetError());
     return false;
   }
@@ -69,15 +69,15 @@ bool Renderer::renderFrame(const cv::Mat& frame) const noexcept {
 }
 
 Renderer::~Renderer() {
-  if (texture_ != nullptr) {
-    SDL_DestroyTexture(texture_);
-  }
-  if (renderer_ != nullptr) {
-    SDL_DestroyRenderer(renderer_);
-  }
-  if (window_ != nullptr) {
-    SDL_DestroyWindow(window_);
-  }
+  // if (texture_ != nullptr) {
+  //   SDL_DestroyTexture(texture_);
+  // }
+  // if (renderer_ != nullptr) {
+  //   SDL_DestroyRenderer(renderer_);
+  // }
+  // if (window_ != nullptr) {
+  //   SDL_DestroyWindow(window_);
+  // }
   SDL_Quit();
 }
 }  // namespace mvplayer

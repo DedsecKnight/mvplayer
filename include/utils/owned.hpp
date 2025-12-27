@@ -7,6 +7,8 @@ extern "C" {
 #include <libavutil/avutil.h>
 }
 
+#include <SDL3/SDL.h>
+
 namespace mvplayer {
 
 namespace deallocator {
@@ -14,7 +16,7 @@ void AVFrameDeallocator(AVFrame* frame);
 void AVPacketDeallocator(AVPacket* packet);
 }  // namespace deallocator
 
-#define OWNED_RESOURCE(RESOURCE)                                        \
+#define OWNED_FFMPEG_RESOURCE(RESOURCE)                                 \
   class Owned##RESOURCE                                                 \
       : public std::unique_ptr<                                         \
             RESOURCE, decltype(&deallocator::RESOURCE##Deallocator)> {  \
@@ -29,7 +31,28 @@ void AVPacketDeallocator(AVPacket* packet);
         : BaseType{r, deallocator::RESOURCE##Deallocator} {}            \
   };
 
-OWNED_RESOURCE(AVFrame)
-OWNED_RESOURCE(AVPacket)
+#define OWNED_SDL_RESOURCE(RESOURCE)                                       \
+  class OwnedSdl##RESOURCE                                                 \
+      : public std::unique_ptr<SDL_##RESOURCE,                             \
+                               decltype(&SDL_Destroy##RESOURCE)> {         \
+   private:                                                                \
+    using BaseType =                                                       \
+        std::unique_ptr<SDL_##RESOURCE, decltype(&SDL_Destroy##RESOURCE)>; \
+                                                                           \
+   public:                                                                 \
+    using BaseType::unique_ptr;                                            \
+    [[nodiscard]] OwnedSdl##RESOURCE(SDL_##RESOURCE* r)                    \
+        : BaseType{r, SDL_Destroy##RESOURCE} {}                            \
+  };
+
+OWNED_FFMPEG_RESOURCE(AVFrame)
+OWNED_FFMPEG_RESOURCE(AVPacket)
+
+OWNED_SDL_RESOURCE(Window)
+OWNED_SDL_RESOURCE(Renderer)
+OWNED_SDL_RESOURCE(Texture)
+
+#undef OWNED_FFMPEG_RESOURCE
+#undef OWNED_SDL_RESOURCE
 
 }  // namespace mvplayer

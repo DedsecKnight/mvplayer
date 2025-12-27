@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <opencv2/core.hpp>
 
+#include "utils/owned.hpp"
+
 namespace mvplayer {
 class Renderer {
  public:
@@ -15,8 +17,8 @@ class Renderer {
 
  private:
   int32_t width_, height_, padding_;
-  SDL_Window* window_{nullptr};
-  SDL_Renderer* renderer_{nullptr};
-  SDL_Texture* texture_{nullptr};
+  OwnedSdlWindow window_{nullptr};
+  OwnedSdlRenderer renderer_{nullptr};
+  OwnedSdlTexture texture_{nullptr};
 };
 }  // namespace mvplayer
