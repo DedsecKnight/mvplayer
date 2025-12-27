@@ -52,7 +52,7 @@ bool Renderer::renderFrame(const cv::Mat& frame) const noexcept {
                      cv::BORDER_CONSTANT);
 
   void* pixels;
-  int pitch;
+  int32_t pitch;
   if (!SDL_LockTexture(texture_.get(), nullptr, &pixels, &pitch)) {
     spdlog::error("Error creating texture: {}", SDL_GetError());
     return false;

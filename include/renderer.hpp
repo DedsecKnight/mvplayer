@@ -10,7 +10,7 @@
 namespace mvplayer {
 class Renderer {
  public:
-  [[nodiscard]] Renderer(int32_t width, int32_t height, int padding);
+  [[nodiscard]] Renderer(int32_t width, int32_t height, int32_t padding);
   [[nodiscard]] bool renderFrame(const cv::Mat& frame) const noexcept;
   void start() const noexcept;
   ~Renderer();
