@@ -13,9 +13,11 @@ class VideoPlayerRecipe(ConanFile):
         self.requires("cli11/2.6.0")
         self.requires("spdlog/1.16.0")
         self.requires("opencv/4.12.0")
+        self.requires("sdl/3.2.20")
 
     def configure(self):
         self.options["ffmpeg"].with_pulse = False
+        self.options["sdl"].shared = True
 
     def generate(self):
         tc = CMakeToolchain(self, generator="Ninja")

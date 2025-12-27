@@ -79,12 +79,9 @@ std::optional<FrameInfo> VideoPlayer::getFrame() const noexcept {
   cv::Mat frame(convertedFrame->height, convertedFrame->width, CV_8UC3);
   std::memcpy(frame.data, convertedFrame->data[0],
               frame.elemSize() * frame.total());
-  cv::cvtColor(frame, frame, cv::COLOR_RGB2BGR);
 
-  auto frameInfo =
-      FrameInfo{frame, pCodecContext_->frame_num, pFrame->pts, pFrame->pkt_dts};
-
-  return frameInfo;
+  return FrameInfo{frame, pCodecContext_->frame_num, pFrame->pts,
+                   pFrame->pkt_dts};
 }
 
 std::span<AVStream*> VideoPlayer::getMediaStreams() const noexcept {

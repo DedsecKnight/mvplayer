@@ -1,10 +1,13 @@
 
+#include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
 #include <CLI/CLI.hpp>
+#include <chrono>
 #include <opencv2/imgcodecs.hpp>
 
 #include "player.hpp"
+#include "renderer.hpp"
 
 int main(int argc, char** argv) {
   CLI::App app;
@@ -24,16 +27,29 @@ int main(int argc, char** argv) {
         videoInfo->fps.num / videoInfo->fps.den, videoInfo->bitRate);
     spdlog::info("Video Codec: {}", videoInfo->codecName);
 
-    bool singleFrameWritten{false};
+    mvplayer::Renderer renderer{videoInfo->width, videoInfo->height, 10};
+    SDL_Event e;
+
     for (auto frameInfo = player.getFrame(); frameInfo.has_value();
          frameInfo = player.getFrame()) {
-      spdlog::info("Received new frame: frame = {}; pts = {}; dts = {}",
-                   frameInfo->frameNo, frameInfo->pts, frameInfo->dts);
-      if (!singleFrameWritten) {
-        cv::imwrite("/home/ddscknight/dev/video-player/0001.png",
-                    frameInfo->frame);
-        singleFrameWritten = true;
+      while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_EVENT_QUIT) {
+          return 0;
+        }
       }
+      auto start = std::chrono::high_resolution_clock::now();
+      if (!renderer.renderFrame(frameInfo->frame)) {
+        spdlog::error("Error rendering frame");
+        return 1;
+      }
+      auto end = std::chrono::high_resolution_clock::now();
+
+      auto renderTime =
+          std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+              .count();
+      spdlog::info("Rendered new frame in {}ms: frame = {}; pts = {}; dts = {}",
+                   renderTime, frameInfo->frameNo, frameInfo->pts,
+                   frameInfo->dts);
     }
   }
 }
