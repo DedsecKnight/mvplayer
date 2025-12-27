@@ -1,4 +1,4 @@
-#include "renderer.hpp"
+#include "FrameRenderer.hpp"
 
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -8,7 +8,7 @@
 #include <opencv2/imgproc.hpp>
 
 namespace mvplayer {
-Renderer::Renderer(int32_t width, int32_t height, int32_t padding)
+FrameRenderer::FrameRenderer(int32_t width, int32_t height, int32_t padding)
     : width_{width}, height_{height}, padding_{padding} {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     throw std::runtime_error{
@@ -43,7 +43,7 @@ Renderer::Renderer(int32_t width, int32_t height, int32_t padding)
   spdlog::trace("SDL Texture created successfully");
 }
 
-bool Renderer::renderFrame(const cv::Mat& frame) const noexcept {
+bool FrameRenderer::renderFrame(const cv::Mat& frame) const noexcept {
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
 
@@ -68,16 +68,5 @@ bool Renderer::renderFrame(const cv::Mat& frame) const noexcept {
   return true;
 }
 
-Renderer::~Renderer() {
-  // if (texture_ != nullptr) {
-  //   SDL_DestroyTexture(texture_);
-  // }
-  // if (renderer_ != nullptr) {
-  //   SDL_DestroyRenderer(renderer_);
-  // }
-  // if (window_ != nullptr) {
-  //   SDL_DestroyWindow(window_);
-  // }
-  SDL_Quit();
-}
+FrameRenderer::~FrameRenderer() { SDL_Quit(); }
 }  // namespace mvplayer

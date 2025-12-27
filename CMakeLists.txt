@@ -16,10 +16,10 @@ find_package(SDL3 REQUIRED CONFIG)
 add_library(videoplayer)
 target_sources(videoplayer
   PRIVATE
-    src/player.cpp
+    src/VideoReader.cpp
     src/utils/conversion.cpp
     src/utils/owned.cpp
-    src/renderer.cpp
+    src/FrameRenderer.cpp
 
   PRIVATE
     FILE_SET vplayerPrivateHeaders
@@ -36,9 +36,9 @@ target_sources(videoplayer
     BASE_DIRS
       include
     FILES
-      include/player.hpp
+      include/VideoReader.hpp
       include/utils/conversion.hpp
-      include/renderer.hpp
+      include/FrameRenderer.hpp
 )
 target_link_libraries(videoplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv SDL3::SDL3)
 

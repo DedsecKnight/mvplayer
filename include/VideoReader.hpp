@@ -11,9 +11,9 @@ extern "C" {
 }
 
 namespace mvplayer {
-class VideoPlayer {
+class VideoReader {
  public:
-  ~VideoPlayer() noexcept;
+  ~VideoReader() noexcept;
   [[nodiscard]] std::optional<VideoInfo> loadVideo(
       const std::filesystem::path& filename) noexcept;
   [[nodiscard]] std::optional<FrameInfo> getFrame() const noexcept;

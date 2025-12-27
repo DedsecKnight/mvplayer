@@ -1,4 +1,4 @@
-#include "player.hpp"
+#include "VideoReader.hpp"
 
 #include <filesystem>
 
@@ -17,7 +17,7 @@ extern "C" {
 #include <opencv2/imgproc.hpp>
 
 namespace mvplayer {
-std::optional<VideoInfo> VideoPlayer::loadVideo(
+std::optional<VideoInfo> VideoReader::loadVideo(
     const std::filesystem::path& filename) noexcept {
   spdlog::info("Reading video file: {}", filename.filename().string());
   if (avformat_open_input(&pFormatContext_, filename.c_str(), nullptr,
@@ -60,7 +60,7 @@ std::optional<VideoInfo> VideoPlayer::loadVideo(
                    pCodecParams->height};
 }
 
-std::optional<FrameInfo> VideoPlayer::getFrame() const noexcept {
+std::optional<FrameInfo> VideoReader::getFrame() const noexcept {
   OwnedAVPacket pPacket{av_packet_alloc()};
   OwnedAVFrame pFrame{av_frame_alloc()};
 
@@ -82,7 +82,7 @@ std::optional<FrameInfo> VideoPlayer::getFrame() const noexcept {
                    pFrame->pkt_dts};
 }
 
-std::span<AVStream*> VideoPlayer::getMediaStreams() const noexcept {
+std::span<AVStream*> VideoReader::getMediaStreams() const noexcept {
   if (avformat_find_stream_info(pFormatContext_, nullptr)) {
     return {};
   }
@@ -92,7 +92,7 @@ std::span<AVStream*> VideoPlayer::getMediaStreams() const noexcept {
       pFormatContext_->streams + pFormatContext_->nb_streams};
 }
 
-bool VideoPlayer::loadCodecContext(const AVCodec* pCodec,
+bool VideoReader::loadCodecContext(const AVCodec* pCodec,
                                    AVCodecParameters* pCodecParams) noexcept {
   pCodecContext_ = avcodec_alloc_context3(pCodec);
   if (avcodec_parameters_to_context(pCodecContext_, pCodecParams) < 0) {
@@ -104,7 +104,7 @@ bool VideoPlayer::loadCodecContext(const AVCodec* pCodec,
   return true;
 }
 
-VideoPlayer::~VideoPlayer() noexcept {
+VideoReader::~VideoReader() noexcept {
   if (pCodecContext_ != nullptr) {
     avcodec_free_context(&pCodecContext_);
   }

@@ -6,8 +6,8 @@
 #include <chrono>
 #include <opencv2/imgcodecs.hpp>
 
-#include "player.hpp"
-#include "renderer.hpp"
+#include "FrameRenderer.hpp"
+#include "VideoReader.hpp"
 
 int main(int argc, char** argv) {
   CLI::App app;
@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
   app.add_option("-i", inputFileName, "Input video filename")->required();
   CLI11_PARSE(app, argc, argv);
 
-  mvplayer::VideoPlayer player{};
+  mvplayer::VideoReader player{};
 
   if (auto videoInfo = player.loadVideo(inputFileName); videoInfo.has_value()) {
     spdlog::info(
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         videoInfo->fps.num / videoInfo->fps.den, videoInfo->bitRate);
     spdlog::info("Video Codec: {}", videoInfo->codecName);
 
-    mvplayer::Renderer renderer{videoInfo->width, videoInfo->height, 10};
+    mvplayer::FrameRenderer renderer{videoInfo->width, videoInfo->height, 10};
     SDL_Event e;
 
     for (auto frameInfo = player.getFrame(); frameInfo.has_value();

@@ -8,12 +8,12 @@
 #include "utils/owned.hpp"
 
 namespace mvplayer {
-class Renderer {
+class FrameRenderer {
  public:
-  [[nodiscard]] Renderer(int32_t width, int32_t height, int32_t padding);
+  [[nodiscard]] FrameRenderer(int32_t width, int32_t height, int32_t padding);
   [[nodiscard]] bool renderFrame(const cv::Mat& frame) const noexcept;
   void start() const noexcept;
-  ~Renderer();
+  ~FrameRenderer();
 
  private:
   int32_t width_, height_, padding_;
