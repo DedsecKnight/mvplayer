@@ -51,13 +51,11 @@ std::optional<VideoInfo> VideoReader::loadVideo(
     return std::nullopt;
   }
 
-  return VideoInfo{pFormatContext_->iformat->long_name,
-                   pCodec->long_name,
-                   (*videoStreamIt)->avg_frame_rate,
-                   pCodecParams->bit_rate,
-                   pFormatContext_->duration,
-                   pCodecParams->width,
-                   pCodecParams->height};
+  return std::optional<VideoInfo>{
+      std::in_place,          pFormatContext_->iformat->long_name,
+      pCodec->long_name,      (*videoStreamIt)->avg_frame_rate,
+      pCodecParams->bit_rate, pFormatContext_->duration,
+      pCodecParams->width,    pCodecParams->height};
 }
 
 std::optional<FrameInfo> VideoReader::getFrame() const noexcept {
@@ -78,8 +76,9 @@ std::optional<FrameInfo> VideoReader::getFrame() const noexcept {
   std::memcpy(frame.data, convertedFrame->data[0],
               frame.elemSize() * frame.total());
 
-  return FrameInfo{frame, pCodecContext_->frame_num, pFrame->pts,
-                   pFrame->pkt_dts};
+  return std::optional<FrameInfo>{std::in_place, frame,
+                                  pCodecContext_->frame_num, pFrame->pts,
+                                  pFrame->pkt_dts};
 }
 
 std::span<AVStream*> VideoReader::getMediaStreams() const noexcept {
