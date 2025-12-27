@@ -17,7 +17,8 @@ add_library(videoplayer)
 target_sources(videoplayer
   PRIVATE
     src/player.cpp
-    src/utils.cpp
+    src/utils/conversion.cpp
+    src/utils/owned.cpp
     src/renderer.cpp
 
   PRIVATE
@@ -27,6 +28,7 @@ target_sources(videoplayer
       include
     FILES
       include/info.hpp
+      include/utils/owned.hpp
 
   PUBLIC
     FILE_SET vplayerHeaders
@@ -35,7 +37,7 @@ target_sources(videoplayer
       include
     FILES
       include/player.hpp
-      include/utils.hpp
+      include/utils/conversion.hpp
       include/renderer.hpp
 )
 target_link_libraries(videoplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv SDL3::SDL3)

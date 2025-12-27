@@ -3,7 +3,8 @@
 #include <filesystem>
 
 #include "info.hpp"
-#include "utils.hpp"
+#include "utils/conversion.hpp"
+#include "utils/owned.hpp"
 
 extern "C" {
 #include <libavcodec/codec.h>
@@ -60,11 +61,8 @@ std::optional<VideoInfo> VideoPlayer::loadVideo(
 }
 
 std::optional<FrameInfo> VideoPlayer::getFrame() const noexcept {
-  std::unique_ptr<AVPacket, decltype(&utils::avPacketDeallocator)> pPacket{
-      av_packet_alloc(), utils::avPacketDeallocator};
-
-  std::unique_ptr<AVFrame, decltype(&utils::avFrameDeallocator)> pFrame{
-      av_frame_alloc(), utils::avFrameDeallocator};
+  OwnedAVPacket pPacket{av_packet_alloc()};
+  OwnedAVFrame pFrame{av_frame_alloc()};
 
   if (av_read_frame(pFormatContext_, pPacket.get()) < 0) {
     return std::nullopt;

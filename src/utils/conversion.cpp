@@ -1,4 +1,6 @@
-#include "utils.hpp"
+#include "utils/conversion.hpp"
+
+#include "utils/owned.hpp"
 
 extern "C" {
 #include <libavutil/imgutils.h>
@@ -6,14 +8,8 @@ extern "C" {
 }
 
 namespace mvplayer::utils {
-
-void avFrameDeallocator(AVFrame* frame) { av_frame_free(&frame); }
-void avPacketDeallocator(AVPacket* packet) { av_packet_free(&packet); }
-
-std::unique_ptr<AVFrame, decltype(&utils::avFrameDeallocator)> convertFrame(
-    AVFrame* srcFrame, AVPixelFormat dstFormat) {
-  std::unique_ptr<AVFrame, decltype(&utils::avFrameDeallocator)> destFrame{
-      av_frame_alloc(), utils::avFrameDeallocator};
+OwnedAVFrame convertFrame(AVFrame* srcFrame, AVPixelFormat dstFormat) {
+  OwnedAVFrame destFrame{av_frame_alloc()};
   if (destFrame == nullptr) {
     return destFrame;
   }
