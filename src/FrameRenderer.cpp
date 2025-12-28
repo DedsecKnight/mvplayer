@@ -7,35 +7,32 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "SdlManager.hpp"
+
 namespace mvplayer {
 FrameRenderer::FrameRenderer(int32_t width, int32_t height, int32_t padding)
     : width_{width}, height_{height}, padding_{padding} {
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    throw std::runtime_error{
-        std::format("Error initializing SDL: {}", SDL_GetError())};
-  }
   int32_t paddedWidth = width_ + 2 * padding_;
   int32_t paddedHeight = height_ + 2 * padding_;
 
-  window_ = SDL_CreateWindow("video-player", paddedWidth, paddedHeight,
-                             SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS);
+  window_ = SdlManager::CreateWindow("video-player", paddedWidth, paddedHeight);
   if (window_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating window: {}", SDL_GetError())};
   }
   spdlog::trace("SDL Window created successfully");
 
-  renderer_ = SDL_CreateRenderer(window_.get(), nullptr);
+  renderer_ = SdlManager::CreateRenderer(window_.get());
   if (renderer_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating renderer: {}", SDL_GetError())};
   }
   spdlog::trace("SDL Renderer created successfully");
 
-  texture_ =
-      SDL_CreateTexture(renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_RGB24,
-                        SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING,
-                        paddedWidth, paddedHeight);
+  texture_ = SdlManager::CreateTexture(
+      renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_RGB24,
+      SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, paddedWidth,
+      paddedHeight);
   if (texture_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating texture: {}", SDL_GetError())};
@@ -68,5 +65,5 @@ bool FrameRenderer::renderFrame(const cv::Mat& frame) const noexcept {
   return true;
 }
 
-FrameRenderer::~FrameRenderer() { SDL_Quit(); }
+FrameRenderer::~FrameRenderer() { SDL_QuitSubSystem(SDL_INIT_VIDEO); }
 }  // namespace mvplayer
