@@ -43,4 +43,5 @@ target_sources(videoplayer
 target_link_libraries(videoplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv SDL3::SDL3)
 
 add_subdirectory(apps)
+add_subdirectory(tests)
 
