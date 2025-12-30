@@ -8,31 +8,31 @@ extern "C" {
 }
 
 namespace mvplayer::utils {
-OwnedAVFrame convertFrame(AVFrame* srcFrame, AVPixelFormat dstFormat) {
-  OwnedAVFrame destFrame{av_frame_alloc()};
-  if (destFrame == nullptr) {
-    return destFrame;
+av_frame convert_frame(AVFrame* src_frame, AVPixelFormat dst_format) {
+  av_frame dest_frame{av_frame_alloc()};
+  if (dest_frame == nullptr) {
+    return dest_frame;
   }
 
-  if (av_image_alloc(destFrame->data, destFrame->linesize, srcFrame->width,
-                     srcFrame->height, dstFormat, 1) < 0) {
-    destFrame.reset(nullptr);
-    return destFrame;
+  if (av_image_alloc(dest_frame->data, dest_frame->linesize, src_frame->width,
+                     src_frame->height, dst_format, 1) < 0) {
+    dest_frame.reset(nullptr);
+    return dest_frame;
   }
 
-  destFrame->width = srcFrame->width;
-  destFrame->height = srcFrame->height;
-  destFrame->format = dstFormat;
+  dest_frame->width = src_frame->width;
+  dest_frame->height = src_frame->height;
+  dest_frame->format = dst_format;
 
   SwsContext* conversionContext =
-      sws_getContext(srcFrame->width, srcFrame->height,
-                     static_cast<AVPixelFormat>(srcFrame->format),
-                     destFrame->width, destFrame->height, dstFormat,
+      sws_getContext(src_frame->width, src_frame->height,
+                     static_cast<AVPixelFormat>(src_frame->format),
+                     dest_frame->width, dest_frame->height, dst_format,
                      SWS_FAST_BILINEAR | SWS_FULL_CHR_H_INT | SWS_ACCURATE_RND,
                      nullptr, nullptr, nullptr);
-  sws_scale(conversionContext, srcFrame->data, srcFrame->linesize, 0,
-            srcFrame->height, destFrame->data, destFrame->linesize);
+  sws_scale(conversionContext, src_frame->data, src_frame->linesize, 0,
+            src_frame->height, dest_frame->data, dest_frame->linesize);
   sws_freeContext(conversionContext);
-  return destFrame;
+  return dest_frame;
 }
 }  // namespace mvplayer::utils

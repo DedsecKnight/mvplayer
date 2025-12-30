@@ -16,6 +16,7 @@ void AVFrameDeallocator(AVFrame* frame);
 void AVPacketDeallocator(AVPacket* packet);
 }  // namespace deallocator
 
+namespace details {
 #define OWNED_FFMPEG_RESOURCE(RESOURCE)                                 \
   class Owned##RESOURCE                                                 \
       : public std::unique_ptr<                                         \
@@ -51,6 +52,14 @@ OWNED_FFMPEG_RESOURCE(AVPacket)
 OWNED_SDL_RESOURCE(Window)
 OWNED_SDL_RESOURCE(Renderer)
 OWNED_SDL_RESOURCE(Texture)
+}  // namespace details
+
+using sdl_window = details::OwnedSdlWindow;
+using sdl_renderer = details::OwnedSdlRenderer;
+using sdl_texture = details::OwnedSdlTexture;
+
+using av_frame = details::OwnedAVFrame;
+using av_packet = details::OwnedAVPacket;
 
 #undef OWNED_FFMPEG_RESOURCE
 #undef OWNED_SDL_RESOURCE

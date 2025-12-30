@@ -1,4 +1,4 @@
-#include "FrameRenderer.hpp"
+#include "frame_renderer.hpp"
 
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -7,32 +7,33 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include "SdlManager.hpp"
+#include "sdl_manager.hpp"
 
 namespace mvplayer {
-FrameRenderer::FrameRenderer(int32_t width, int32_t height, int32_t padding)
+frame_renderer::frame_renderer(int32_t width, int32_t height, int32_t padding)
     : width_{width}, height_{height}, padding_{padding} {
-  int32_t paddedWidth = width_ + 2 * padding_;
-  int32_t paddedHeight = height_ + 2 * padding_;
+  int32_t padded_width = width_ + 2 * padding_;
+  int32_t padded_height = height_ + 2 * padding_;
 
-  window_ = SdlManager::CreateWindow("video-player", paddedWidth, paddedHeight);
+  window_ =
+      sdl_manager::create_window("video-player", padded_width, padded_height);
   if (window_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating window: {}", SDL_GetError())};
   }
   spdlog::trace("SDL Window created successfully");
 
-  renderer_ = SdlManager::CreateRenderer(window_.get());
+  renderer_ = sdl_manager::create_renderer(window_.get());
   if (renderer_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating renderer: {}", SDL_GetError())};
   }
   spdlog::trace("SDL Renderer created successfully");
 
-  texture_ = SdlManager::CreateTexture(
+  texture_ = sdl_manager::create_texture(
       renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_RGB24,
-      SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, paddedWidth,
-      paddedHeight);
+      SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, padded_width,
+      padded_height);
   if (texture_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating texture: {}", SDL_GetError())};
@@ -40,13 +41,13 @@ FrameRenderer::FrameRenderer(int32_t width, int32_t height, int32_t padding)
   spdlog::trace("SDL Texture created successfully");
 }
 
-bool FrameRenderer::renderFrame(const cv::Mat& frame) const noexcept {
+bool frame_renderer::render_frame(const cv::Mat& frame) const noexcept {
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
 
-  cv::Mat paddedFrame;
-  cv::copyMakeBorder(frame, paddedFrame, padding_, padding_, padding_, padding_,
-                     cv::BORDER_CONSTANT);
+  cv::Mat padded_frame;
+  cv::copyMakeBorder(frame, padded_frame, padding_, padding_, padding_,
+                     padding_, cv::BORDER_CONSTANT);
 
   void* pixels;
   int32_t pitch;
@@ -54,7 +55,7 @@ bool FrameRenderer::renderFrame(const cv::Mat& frame) const noexcept {
     spdlog::error("Error creating texture: {}", SDL_GetError());
     return false;
   }
-  std::memcpy(pixels, paddedFrame.data, frame.elemSize() * frame.total());
+  std::memcpy(pixels, padded_frame.data, frame.elemSize() * frame.total());
   SDL_UnlockTexture(texture_.get());
 
   if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr, nullptr) ||
@@ -65,5 +66,5 @@ bool FrameRenderer::renderFrame(const cv::Mat& frame) const noexcept {
   return true;
 }
 
-FrameRenderer::~FrameRenderer() { SDL_QuitSubSystem(SDL_INIT_VIDEO); }
+frame_renderer::~frame_renderer() { SDL_QuitSubSystem(SDL_INIT_VIDEO); }
 }  // namespace mvplayer

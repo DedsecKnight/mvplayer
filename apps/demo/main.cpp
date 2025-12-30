@@ -6,50 +6,52 @@
 #include <chrono>
 #include <opencv2/imgcodecs.hpp>
 
-#include "FrameRenderer.hpp"
-#include "VideoReader.hpp"
+#include "frame_renderer.hpp"
+#include "video_reader.hpp"
 
 int main(int argc, char** argv) {
   CLI::App app;
-  std::string inputFileName{};
-  app.add_option("-i", inputFileName, "Input video filename")->required();
+  std::string input_filename{};
+  app.add_option("-i", input_filename, "Input video filename")->required();
   CLI11_PARSE(app, argc, argv);
 
-  mvplayer::VideoReader player{};
+  mvplayer::video_reader player{};
 
-  if (auto videoInfo = player.loadVideo(inputFileName); videoInfo.has_value()) {
+  if (auto video_info = player.load_video(input_filename);
+      video_info.has_value()) {
     spdlog::info(
         std::format("Succesfully read video file. Format {}, duration {} us",
-                    videoInfo->format, videoInfo->duration));
+                    video_info->format, video_info->duration));
     spdlog::info(
         "Detected video stream: resolution {} x {} @ {}fps. Bit rate: {}",
-        videoInfo->width, videoInfo->height,
-        videoInfo->fps.num / videoInfo->fps.den, videoInfo->bitRate);
-    spdlog::info("Video Codec: {}", videoInfo->codecName);
+        video_info->width, video_info->height,
+        video_info->fps.num / video_info->fps.den, video_info->bit_rate);
+    spdlog::info("Video Codec: {}", video_info->codec_name);
 
-    mvplayer::FrameRenderer renderer{videoInfo->width, videoInfo->height, 10};
+    mvplayer::frame_renderer renderer{video_info->width, video_info->height,
+                                      10};
     SDL_Event e;
 
-    for (auto frameInfo = player.getFrame(); frameInfo.has_value();
-         frameInfo = player.getFrame()) {
+    for (auto frame_info = player.get_frame(); frame_info.has_value();
+         frame_info = player.get_frame()) {
       while (SDL_PollEvent(&e)) {
         if (e.type == SDL_EVENT_QUIT) {
           return 0;
         }
       }
       auto start = std::chrono::high_resolution_clock::now();
-      if (!renderer.renderFrame(frameInfo->frame)) {
+      if (!renderer.render_frame(frame_info->frame)) {
         spdlog::error("Error rendering frame");
         return 1;
       }
       auto end = std::chrono::high_resolution_clock::now();
 
-      auto renderTime =
+      auto render_time =
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
               .count();
       spdlog::info("Rendered new frame in {}ms: frame = {}; pts = {}; dts = {}",
-                   renderTime, frameInfo->frameNo, frameInfo->pts,
-                   frameInfo->dts);
+                   render_time, frame_info->frame_no, frame_info->pts,
+                   frame_info->dts);
     }
   }
 }

@@ -9,15 +9,15 @@ extern "C" {
 }
 
 namespace mvplayer {
-struct VideoInfo {
-  std::string_view codecName, format;
+struct video_info {
+  std::string_view codec_name, format;
   AVRational fps;
-  int64_t bitRate, duration;
+  int64_t bit_rate, duration;
   int32_t width, height;
 };
 
-struct FrameInfo {
+struct frame_info {
   cv::Mat frame;
-  int64_t frameNo, pts, dts;
+  int64_t frame_no, pts, dts;
 };
 }  // namespace mvplayer
