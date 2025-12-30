@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <memory>
 
-namespace mvplayer::utils {
+namespace multithreaded::utils {
 
 /// Single Producer - Single Consumer Lock-free Ring Buffer
 template <typename T, std::size_t Size = 3>
@@ -59,4 +59,4 @@ class spsc_queue {
   alignas(CACHE_LINE_SIZE) std::byte data_[sizeof(T) * (Size + 1)];
 };
 
-}  // namespace mvplayer::utils
+}  // namespace multithreaded::utils

@@ -30,7 +30,7 @@ class mock_object : public mock_call_tracker {
 };
 
 TEST(SPSCQueueTest, BasicDataType) {
-  mvplayer::utils::spsc_queue<int> queue{};
+  multithreaded::utils::spsc_queue<int> queue{};
   std::thread producer{[&queue]() {
     for (int i = 0; i < 3; i++) {
       EXPECT_EQ(queue.push(i), true);
@@ -49,7 +49,7 @@ TEST(SPSCQueueTest, BasicDataType) {
 }
 
 TEST(SPSCQueueTest, PushFullQueue) {
-  mvplayer::utils::spsc_queue<int> queue{};
+  multithreaded::utils::spsc_queue<int> queue{};
   for (int i = 0; i < 3; i++) {
     EXPECT_EQ(queue.push(i), true);
   }
@@ -57,7 +57,7 @@ TEST(SPSCQueueTest, PushFullQueue) {
 }
 
 TEST(SPSCQueueTest, PopEmptyQueue) {
-  mvplayer::utils::spsc_queue<int> queue{};
+  multithreaded::utils::spsc_queue<int> queue{};
   int val;
   EXPECT_EQ(queue.pop(val), false);
 }
@@ -67,7 +67,7 @@ TEST(SPSCQueueTest, LargeDataStream) {
   for (auto& elem : random_values) {
     elem = rand();
   }
-  mvplayer::utils::spsc_queue<int, 131071> queue{};
+  multithreaded::utils::spsc_queue<int, 131071> queue{};
   std::thread producer{[&queue, &random_values]() {
     for (size_t i{}; i < random_values.size(); i++) {
       EXPECT_EQ(queue.push(random_values[i]), true);
@@ -86,7 +86,7 @@ TEST(SPSCQueueTest, LargeDataStream) {
 }
 
 TEST(SPSCQueueTest, ComplexDataType) {
-  mvplayer::utils::spsc_queue<std::string> queue{};
+  multithreaded::utils::spsc_queue<std::string> queue{};
   std::thread producer{[&queue]() {
     EXPECT_EQ(queue.push("hello"), true);
     EXPECT_EQ(queue.push("world"), true);
@@ -106,7 +106,7 @@ TEST(SPSCQueueTest, ComplexDataType) {
 
 TEST(SPSCQueueTest, TestCopyConstructorInvocation) {
   mock_call_tracker::reset_counter();
-  mvplayer::utils::spsc_queue<mock_object> queue{};
+  multithreaded::utils::spsc_queue<mock_object> queue{};
   std::thread producer{
       [&queue]() { EXPECT_EQ(queue.push(mock_object{}), true); }};
   std::thread consumer{[&queue]() {
@@ -121,7 +121,7 @@ TEST(SPSCQueueTest, TestCopyConstructorInvocation) {
 
 TEST(SPSCQueueTest, TestDestructorInvocation) {
   mock_call_tracker::reset_counter();
-  mvplayer::utils::spsc_queue<mock_object> queue{};
+  multithreaded::utils::spsc_queue<mock_object> queue{};
   std::thread producer{
       [&queue]() { EXPECT_EQ(queue.push(mock_object{}), true); }};
   std::thread consumer{[&queue]() {
