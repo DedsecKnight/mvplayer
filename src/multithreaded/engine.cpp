@@ -1,5 +1,7 @@
 #include "engine.hpp"
 
+#include "processor.hpp"
+
 namespace multithreaded {
 
 engine::~engine() noexcept {
@@ -10,9 +12,9 @@ engine::~engine() noexcept {
   }
 }
 
-void engine::start(std::span<char* const>) noexcept {
-  // for (const auto& [_, processor] : processor_registry_) {
-  //   processor_threads_.emplace_back(&processor::start, &processor);
-  // }
+void engine::start(std::span<char* const> args) noexcept {
+  for (const auto& [_, processor] : processor_registry_) {
+    processor_threads_.emplace_back(&any_processor::start, &processor, args);
+  }
 }
 }  // namespace multithreaded

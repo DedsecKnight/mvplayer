@@ -1,10 +1,14 @@
 #pragma once
 
 #include <concepts>
+#include <span>
 #include <string_view>
 #include <vector>
 
-#include "connector.hpp"
+#include "connector/read/any.hpp"
+#include "connector/read/port.hpp"
+#include "connector/write/any.hpp"
+#include "connector/write/port.hpp"
 
 namespace multithreaded {
 
@@ -23,6 +27,8 @@ class any_processor {
 
   struct processor_concept {
     virtual ~processor_concept() = default;
+    virtual void start_event_loop(
+        std::span<char* const> args) const noexcept = 0;
   };
 
   template <typename processor_t>
@@ -35,12 +41,12 @@ class any_processor {
         : processor_(std::forward<arg_ts>(args)...) {}
 
     template <typename... event_ts>
-    void add_read_port(read_only_port<event_ts...>&& read_port) {
+    void add_read_port(read::port<event_ts...>&& read_port) {
       input_queue_.emplace_back(std::move(read_port));
     }
 
     template <typename... event_ts>
-    void add_write_port(write_only_port<event_ts...>&& write_port) {
+    void add_write_port(write::port<event_ts...>&& write_port) {
       output_queue_.emplace_back(std::move(write_port));
     }
 
@@ -49,11 +55,18 @@ class any_processor {
       processor_.handle_event(std::forward<event_t>(e));
     }
 
-    void start() noexcept {}
+    void start_event_loop(std::span<char* const> args) const noexcept override {
+      processor_.on_startup(args);
+      while (true) {
+        for ([[maybe_unused]] const auto& rp : input_queue_) {
+          // TODO: figure out what to do here to process input from queue
+        }
+      }
+    }
 
    private:
-    std::vector<any_read_port> input_queue_;
-    std::vector<any_write_port> output_queue_;
+    std::vector<read::any> input_queue_;
+    std::vector<write::any> output_queue_;
     processor_t processor_;
   };
 
@@ -72,6 +85,10 @@ class any_processor {
       throw std::bad_cast{};
     }
     return *processor_ptr;
+  }
+
+  void start(std::span<char* const> args) const noexcept {
+    pimpl_->start_event_loop(args);
   }
 
  private:

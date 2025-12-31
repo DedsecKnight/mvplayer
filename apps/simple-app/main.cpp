@@ -6,12 +6,19 @@ struct ping_event {};
 struct pong_event {};
 
 class ping_processor {
-  // TODO: reply mechanism
+ public:
   void handle_event(const ping_event&) { std::println("Received ping event"); }
+  void on_startup(std::span<char* const>) const noexcept {
+    std::println("Hi from ping");
+  }
 };
 
 class pong_processor {
+ public:
   void handle_event(const pong_event&) { std::println("Received pong event "); }
+  void on_startup(std::span<char* const>) const noexcept {
+    std::println("Hi from pong");
+  }
 };
 
 int main(int argc, char** argv) {

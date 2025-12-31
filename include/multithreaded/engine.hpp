@@ -8,8 +8,8 @@
 #include <utility>
 #include <vector>
 
-#include "connector.hpp"
-#include "processor.hpp"
+#include "connector/connector.hpp"
+#include "processor/processor.hpp"
 
 namespace multithreaded {
 class engine {
@@ -53,6 +53,8 @@ class engine {
     processor_registry_.emplace(
         std::piecewise_construct, std::forward_as_tuple(processor_name),
         std::forward_as_tuple(processor_t{std::forward<arg_ts>(args)...}));
+
+    // TODO: add a signal queue for each processor
     return processor_ref<processor_t>{
         std::ref(processor_registry_.at(processor_name)), std::ref(*this)};
   }
