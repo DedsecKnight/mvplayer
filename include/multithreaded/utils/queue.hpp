@@ -17,6 +17,8 @@ class spsc_queue {
   static constexpr size_t CACHE_LINE_SIZE = 64;
 
  public:
+  using elem_t = T;
+
   [[nodiscard]] bool push(const T& elem) noexcept { return emplace(elem); }
 
   template <typename... ArgTs>

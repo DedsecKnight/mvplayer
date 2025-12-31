@@ -14,7 +14,7 @@ find_package(OpenCV REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 
 add_library(mvplayer)
-add_library(multithreaded INTERFACE)
+add_library(multithreaded)
 
 target_sources(
   mvplayer
@@ -44,21 +44,23 @@ target_sources(
       include/mvplayer/frame_renderer.hpp
 )
 
-target_include_directories(multithreaded INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include/multithreaded)
+target_sources(
+  multithreaded
+  PRIVATE
+    src/multithreaded/engine.cpp
 
-# target_sources(
-#   multithreaded
-#   PUBLIC
-#     FILE_SET multithreadedHeaders
-#     TYPE HEADERS
-#     BASE_DIRS
-#       include
-#     FILES
-#       include/multithreaded/utils/queue.hpp
-# )
+  PUBLIC
+    FILE_SET multithreadedHeaders
+    TYPE HEADERS
+    BASE_DIRS
+      include/multithreaded
+    FILES
+      include/multithreaded/engine.hpp
+      include/multithreaded/utils/queue.hpp
+)
 
 target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv SDL3::SDL3)
-target_link_libraries(multithreaded INTERFACE spdlog::spdlog)
+target_link_libraries(multithreaded PUBLIC spdlog::spdlog)
 
 add_subdirectory(apps)
 add_subdirectory(tests)
