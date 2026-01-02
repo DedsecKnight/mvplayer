@@ -1,6 +1,6 @@
 #include "engine.hpp"
 
-#include "processor.hpp"
+#include "processor/processor.hpp"
 
 namespace multithreaded {
 

@@ -1,13 +1,16 @@
 #include <print>
 
 #include "engine.hpp"
+#include "events/handler.hpp"
 
 struct ping_event {};
 struct pong_event {};
 
-class ping_processor {
+class ping_processor : public multithreaded::events::handlers<ping_event> {
  public:
-  void handle_event(const ping_event&) { std::println("Received ping event"); }
+  void operator()(ping_event&&) override {
+    std::println("Received ping event");
+  }
   void on_startup(std::span<char* const>) const noexcept {
     std::println("Hi from ping");
   }
