@@ -12,14 +12,14 @@
 
 namespace multithreaded {
 
-template <typename processor_t>
-class event_handlers {
- public:
-  template <typename T>
-  void operator()(T&& val) {
-    static_cast<processor_t*>(this)->handle_event(std::forward<T>(val));
-  }
-};
+// template <typename processor_t>
+// class event_handlers {
+//  public:
+//   template <typename T>
+//   void operator()(T&& val) {
+//     static_cast<processor_t*>(this)->handle_event(std::forward<T>(val));
+//   }
+// };
 
 class any_processor {
  private:
@@ -32,8 +32,10 @@ class any_processor {
   };
 
   template <typename processor_t>
-  class processor_model : public processor_concept,
-                          public event_handlers<processor_t> {
+  class processor_model : public processor_concept {
+   private:
+    using event_handler_t = typename processor_t::event_handler_t;
+
    public:
     template <typename... arg_ts>
       requires std::constructible_from<processor_t, arg_ts...>
@@ -59,6 +61,7 @@ class any_processor {
       processor_.on_startup(args);
       while (true) {
         for ([[maybe_unused]] const auto& rp : input_queue_) {
+          // processor_.process_incoming_event(rp);
           // TODO: figure out what to do here to process input from queue
         }
       }
