@@ -6,6 +6,9 @@ jobs:
   ubuntu-build:
     runs-on: ubuntu-latest
     steps: 
+      - name: Update apt package list and install jq
+        run: sudo apt-get update
+
       - name: Checkout 
         uses: actions/checkout@v4
 
