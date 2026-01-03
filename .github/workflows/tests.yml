@@ -1,6 +1,9 @@
 name: C/C++ CI/CD Pipeline
 
-on: [push]
+on: 
+  pull_request:
+    branch: 
+      - main
 
 jobs:
   ubuntu-build:
