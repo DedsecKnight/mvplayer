@@ -1,5 +1,8 @@
 #pragma once
 
+#include <queue>
+#include <variant>
+
 #include "connector/read/event_port.hpp"
 #include "port.hpp"
 
@@ -9,13 +12,24 @@ class any {
   struct port_concept {
     virtual ~port_concept() = default;
 
-    template <typename event_t>
-    [[nodiscard]] bool get_event(event_t& event) noexcept {
-      auto event_port_ptr = dynamic_cast<event_port<event_t>*>(this);
-      if (!event_port_ptr) {
-        return false;
-      }
-      return event_port_ptr->get_event(event);
+    template <typename... processor_event_ts>
+    [[nodiscard]] bool get_event(
+        std::variant<processor_event_ts...>& event) noexcept {
+      auto event_fetcher = [this, &event](auto&& e) -> bool {
+        using processor_event_t = std::decay_t<decltype(e)>;
+        auto event_port_ptr =
+            dynamic_cast<event_port<processor_event_t>*>(this);
+        if (!event_port_ptr) {
+          return false;
+        }
+        if (!event_port_ptr->get_event(e)) {
+          return false;
+        }
+        event = e;
+        return true;
+      };
+
+      return (event_fetcher(processor_event_ts{}) || ...);
     }
   };
 
@@ -24,19 +38,32 @@ class any {
       : public port_concept,
         public event_port_impl<port_model<event_ts...>, event_ts>... {
    public:
-    using acceptable_event_set_t = typename port<event_ts...>::queue_elem_t;
+    using queue_elem_t = typename port<event_ts...>::queue_elem_t;
     port_model(port<event_ts...>&& rport) : read_port_{std::move(rport)} {}
 
-   private:
-    template <typename queue_elem_t>
-    [[nodiscard]] bool pop(queue_elem_t& elem) noexcept {
-      if constexpr ((std::is_same_v<event_ts, queue_elem_t> || ...)) {
-        return read_port_.pop(elem);
+    template <typename event_t>
+    [[nodiscard]] bool pop(event_t& elem) noexcept {
+      if (!pending_queue_.empty() &&
+          std::holds_alternative<event_t>(pending_queue_.front())) {
+        elem = std::get<event_t>(pending_queue_.front());
+        pending_queue_.pop();
+        return true;
       }
+      queue_elem_t queue_element;
+      if (!read_port_.pop(queue_element)) {
+        return false;
+      }
+      if (std::holds_alternative<event_t>(queue_element)) {
+        elem = std::get<event_t>(queue_element);
+        return true;
+      }
+      pending_queue_.emplace(std::move(queue_element));
       return false;
     }
 
    private:
+    // TODO: use fixed-size bounded queue here
+    std::queue<queue_elem_t> pending_queue_;
     port<event_ts...> read_port_;
   };
 
@@ -47,8 +74,9 @@ class any {
   any(port<event_ts...>&& rport)
       : pimpl_{std::make_unique<port_model<event_ts...>>(std::move(rport))} {}
 
-  template <typename event_t>
-  [[nodiscard]] bool get_event(event_t& e) noexcept {
+  template <typename... processor_event_ts>
+  [[nodiscard]] bool get_event(
+      std::variant<processor_event_ts...>& e) noexcept {
     return pimpl_->get_event(e);
   }
 
