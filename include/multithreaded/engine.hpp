@@ -46,13 +46,13 @@ class engine {
  public:
   void start(std::span<char* const> args) noexcept;
 
+  // TODO: add constraint to allow only event handler as processor_t
   template <typename processor_t, typename... arg_ts>
     requires std::constructible_from<processor_t, arg_ts...>
   [[nodiscard]] processor_ref<processor_t> create_processor(
       processor_name_t processor_name, arg_ts&&... args) noexcept {
-    processor_registry_.emplace(
-        std::piecewise_construct, std::forward_as_tuple(processor_name),
-        std::forward_as_tuple(processor_t{std::forward<arg_ts>(args)...}));
+    processor_registry_.emplace(processor_name,
+                                processor_t{std::forward<arg_ts>(args)...});
 
     // TODO: add a signal queue for each processor
     return processor_ref<processor_t>{

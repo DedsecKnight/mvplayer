@@ -12,23 +12,13 @@
 
 namespace multithreaded {
 
-// template <typename processor_t>
-// class event_handlers {
-//  public:
-//   template <typename T>
-//   void operator()(T&& val) {
-//     static_cast<processor_t*>(this)->handle_event(std::forward<T>(val));
-//   }
-// };
-
 class any_processor {
  private:
   using name_t = std::string_view;
 
   struct processor_concept {
     virtual ~processor_concept() = default;
-    virtual void start_event_loop(
-        std::span<char* const> args) const noexcept = 0;
+    virtual void start_event_loop(std::span<char* const> args) noexcept = 0;
   };
 
   template <typename processor_t>
@@ -52,17 +42,16 @@ class any_processor {
       output_queue_.emplace_back(std::move(write_port));
     }
 
-    template <typename event_t>
-    void handle_event(event_t&& e) {
-      processor_.handle_event(std::forward<event_t>(e));
-    }
-
-    void start_event_loop(std::span<char* const> args) const noexcept override {
+    void start_event_loop(std::span<char* const> args) noexcept override {
       processor_.on_startup(args);
+      using event_holder_t = typename processor_t::event_receiver_t;
+      event_holder_t event_holder;
+
       while (true) {
-        for ([[maybe_unused]] const auto& rp : input_queue_) {
-          // processor_.process_incoming_event(rp);
-          // TODO: figure out what to do here to process input from queue
+        for (auto& rp : input_queue_) {
+          if (rp.get_event(event_holder)) {
+            std::visit(processor_, event_holder);
+          }
         }
       }
     }
