@@ -1,0 +1,26 @@
+name: C/C++ CI/CD Pipeline
+
+on: [push]
+
+jobs:
+  ubuntu-build:
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Checkout 
+        uses: actions/checkout@v4
+
+      - name: Install conan
+        uses: conan-io/setup-conan@v1
+
+      - name: Install Conan dependencies
+        run: conan install . --build=missing -pr:h=profiles/profile_linux_x86 -pr:b=profiles/profile_linux_x86
+
+      - name: Build tests
+        shell: bash
+        run: |
+          cmake --preset conan-release
+          cmake --build --preset conan-release
+
+      - name: Run tests
+        run: ./build/Release/tests/test
+
