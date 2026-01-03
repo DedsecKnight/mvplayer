@@ -5,6 +5,9 @@
 namespace multithreaded {
 
 engine::~engine() noexcept {
+  for (const auto& [_, processor] : processor_registry_) {
+    processor.terminate();
+  }
   for (auto& pt : processor_threads_) {
     if (pt.joinable()) {
       pt.join();

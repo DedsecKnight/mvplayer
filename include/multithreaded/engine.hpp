@@ -54,7 +54,6 @@ class engine {
     processor_registry_.emplace(processor_name,
                                 processor_t{std::forward<arg_ts>(args)...});
 
-    // TODO: add a signal queue for each processor
     return processor_ref<processor_t>{
         std::ref(processor_registry_.at(processor_name)), std::ref(*this)};
   }

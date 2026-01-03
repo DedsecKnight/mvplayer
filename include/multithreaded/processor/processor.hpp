@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <concepts>
 #include <span>
 #include <string_view>
@@ -19,6 +20,7 @@ class any_processor {
   struct processor_concept {
     virtual ~processor_concept() = default;
     virtual void start_event_loop(std::span<char* const> args) noexcept = 0;
+    virtual void terminate() noexcept = 0;
   };
 
   template <typename processor_t>
@@ -27,6 +29,10 @@ class any_processor {
     using event_handler_t = typename processor_t::event_handler_t;
 
    public:
+    void terminate() noexcept override {
+      terminated_.store(true, std::memory_order_relaxed);
+    }
+
     template <typename... arg_ts>
       requires std::constructible_from<processor_t, arg_ts...>
     processor_model(arg_ts&&... args)
@@ -47,7 +53,7 @@ class any_processor {
       using event_holder_t = typename processor_t::event_receiver_t;
       event_holder_t event_holder;
 
-      while (true) {
+      while (!terminated_.load(std::memory_order_relaxed)) {
         for (auto& rp : input_queue_) {
           if (rp.get_event(event_holder)) {
             std::visit(processor_, event_holder);
@@ -59,6 +65,7 @@ class any_processor {
    private:
     std::vector<read::any> input_queue_;
     std::vector<write::any> output_queue_;
+    std::atomic<bool> terminated_{false};
     processor_t processor_;
   };
 
@@ -82,6 +89,8 @@ class any_processor {
   void start(std::span<char* const> args) const noexcept {
     pimpl_->start_event_loop(args);
   }
+
+  void terminate() noexcept { pimpl_->terminate(); }
 
  private:
   std::unique_ptr<processor_concept> pimpl_;
