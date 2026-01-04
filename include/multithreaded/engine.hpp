@@ -14,8 +14,6 @@
 namespace multithreaded {
 class engine {
  private:
-  using processor_name_t = std::string_view;
-
   template <typename processor_t>
   class processor_ref {
    public:
@@ -50,12 +48,11 @@ class engine {
   template <typename processor_t, typename... arg_ts>
     requires std::constructible_from<processor_t, arg_ts...>
   [[nodiscard]] processor_ref<processor_t> create_processor(
-      processor_name_t processor_name, arg_ts&&... args) noexcept {
-    processor_registry_.emplace(processor_name,
-                                processor_t{std::forward<arg_ts>(args)...});
+      const std::string& processor_name, arg_ts&&... args) noexcept {
+    auto [it, _] = processor_registry_.emplace(
+        processor_name, processor_t{std::forward<arg_ts>(args)...});
 
-    return processor_ref<processor_t>{
-        std::ref(processor_registry_.at(processor_name)), std::ref(*this)};
+    return processor_ref<processor_t>{std::ref(it->second), std::ref(*this)};
   }
 
   ~engine() noexcept;
@@ -71,7 +68,7 @@ class engine {
 
  private:
   std::vector<std::thread> processor_threads_;
-  std::flat_map<processor_name_t, any_processor> processor_registry_;
+  std::flat_map<std::string, any_processor> processor_registry_;
   std::vector<connector> connectors_;
 };
 }  // namespace multithreaded

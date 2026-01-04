@@ -57,7 +57,7 @@ TEST(MultithreadedTests, HandleEmptyMessage) {
     auto read_port = conn.as_connector_of<event_t>().get_read_port();
     auto write_port = conn.as_connector_of<event_t>().get_write_port();
 
-    auto p1 = e.create_processor<mock_processor>("p1"sv);
+    auto p1 = e.create_processor<mock_processor>("p1");
     auto& casted_p1 = p1.get().as<mock_processor>();
     casted_p1.add_read_port(std::move(read_port));
 
@@ -86,7 +86,7 @@ TEST(MultithreadedTests, HandleNonEmptyMessage) {
     auto read_port = conn.as_connector_of<event_t>().get_read_port();
     auto write_port = conn.as_connector_of<event_t>().get_write_port();
 
-    auto p1 = e.create_processor<mock_processor>("p1"sv);
+    auto p1 = e.create_processor<mock_processor>("p1");
     auto& casted_p1 = p1.get().as<mock_processor>();
     casted_p1.add_read_port(std::move(read_port));
 
@@ -121,7 +121,7 @@ TEST(MultithreadedTests, ProcessorWithMultipleEventHandlers) {
         conn.as_connector_of<mock_event<int32_t>, mock_event<double>>()
             .get_write_port();
 
-    auto p1 = e.create_processor<variadic_mock_processor>("p1"sv);
+    auto p1 = e.create_processor<variadic_mock_processor>("p1");
     auto& casted_p1 = p1.get().as<variadic_mock_processor>();
     casted_p1.add_read_port(std::move(read_port));
 
