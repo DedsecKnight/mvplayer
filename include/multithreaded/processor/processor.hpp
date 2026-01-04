@@ -59,7 +59,12 @@ class any_processor {
 
       while (!terminated_.load(std::memory_order_relaxed)) {
         for (auto&& [sender_name, rp] : input_queue_) {
-          envelope_generator_t envelope_generator{sender_name};
+          write::any* sender_mailbox{nullptr};
+          auto it = output_queue_.find(sender_name);
+          if (it != output_queue_.end()) {
+            sender_mailbox = &it->second;
+          }
+          envelope_generator_t envelope_generator{sender_name, sender_mailbox};
           if (rp.get_event(event_holder)) {
             std::visit(envelope_generator, event_holder);
             std::visit(processor_, envelope_generator.get_enveloped_event());

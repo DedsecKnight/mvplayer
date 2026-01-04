@@ -3,7 +3,7 @@
 #include <variant>
 
 #include "connector/connector.hpp"
-#include "engine.hpp"
+#include "engine/engine.hpp"
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
 
@@ -19,8 +19,8 @@ struct mock_processor
 
   void operator()(const envelope<mock_event<int32_t>>& e) override {
     event_received = true;
-    senders.push_back(e.sender_name);
-    received_payload.push_back(e.payload.x);
+    senders.push_back(e.sender().name());
+    received_payload.push_back(e.payload().x);
   }
   void on_startup(std::span<char* const>) const noexcept {}
 
@@ -37,11 +37,11 @@ struct variadic_mock_processor
 
   void operator()(const envelope<mock_event<int32_t>>& e) override {
     event_received = true;
-    received_payload.emplace_back(e.payload.x);
+    received_payload.emplace_back(e.payload().x);
   }
   void operator()(const envelope<mock_event<double>>& e) override {
     event_received = true;
-    received_payload.emplace_back(e.payload.x);
+    received_payload.emplace_back(e.payload().x);
   }
   void on_startup(std::span<char* const>) const noexcept {}
 
@@ -56,6 +56,32 @@ std::vector<std::string_view> mock_processor::senders{};
 bool variadic_mock_processor::event_received = false;
 std::vector<std::variant<int32_t, double>>
     variadic_mock_processor::received_payload{};
+
+struct ping_event {};
+struct pong_event {};
+
+class ping_processor : public multithreaded::events::handlers<ping_event> {
+ public:
+  void operator()(
+      const multithreaded::events::envelope<ping_event>& e) override {
+    received_event = true;
+    e.reply(pong_event{});
+  }
+  void on_startup(std::span<char* const>) const noexcept {}
+
+  static bool received_event;
+};
+
+struct pong_processor : public multithreaded::events::handlers<pong_event> {
+  void operator()(const multithreaded::events::envelope<pong_event>&) {
+    received_event = true;
+  }
+  void on_startup(std::span<char* const>) const noexcept {}
+  static bool received_event;
+};
+
+bool ping_processor::received_event = false;
+bool pong_processor::received_event = false;
 
 TEST(MultithreadedTests, HandleEmptyMessage) {
   using event_t = mock_event<int32_t>;
@@ -74,8 +100,7 @@ TEST(MultithreadedTests, HandleEmptyMessage) {
     std::vector<char*> args{nullptr};
     e.start(args);
 
-    std::variant<event_t> event = event_t{};
-    EXPECT_EQ(write_port.push(event), true);
+    EXPECT_EQ(write_port.push(event_t{}), true);
 
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(5ms);
@@ -103,8 +128,7 @@ TEST(MultithreadedTests, HandleNonEmptyMessage) {
     std::vector<char*> args{nullptr};
     e.start(args);
 
-    std::variant<event_t> event = event_t{5};
-    EXPECT_EQ(write_port.push(event), true);
+    EXPECT_EQ(write_port.push(event_t{5}), true);
 
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(5ms);
@@ -138,12 +162,8 @@ TEST(MultithreadedTests, ProcessorWithMultipleEventHandlers) {
     std::vector<char*> args{nullptr};
     e.start(args);
 
-    std::variant<mock_event<int32_t>, mock_event<double>> event =
-        mock_event<int32_t>{5};
-    EXPECT_EQ(write_port.push(event), true);
-    event = mock_event<double>{2.0};
-    EXPECT_EQ(std::holds_alternative<mock_event<double>>(event), true);
-    EXPECT_EQ(write_port.push(event), true);
+    EXPECT_EQ(write_port.push(mock_event<int32_t>{5}), true);
+    EXPECT_EQ(write_port.push(mock_event<double>{2.0}), true);
 
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(10ms);
@@ -176,8 +196,7 @@ TEST(MultithreadedTests, TestRecipientName) {
     std::vector<char*> args{nullptr};
     e.start(args);
 
-    std::variant<event_t> event = event_t{5};
-    EXPECT_EQ(write_port.push(event), true);
+    EXPECT_EQ(write_port.push(event_t{5}), true);
 
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(5ms);
@@ -185,4 +204,46 @@ TEST(MultithreadedTests, TestRecipientName) {
 
   EXPECT_EQ(mock_processor::senders.size(), 1);
   EXPECT_EQ(mock_processor::senders[0], "main-thread");
+}
+
+TEST(MultithreadedTests, TestReplyMechanism) {
+  {
+    multithreaded::engine e{};
+    using namespace std::literals;
+
+    auto ping = e.create_processor<ping_processor>("ping");
+    auto pong = e.create_processor<pong_processor>("pong");
+    auto& casted_ping = ping.get().as<ping_processor>();
+    auto& casted_pong = pong.get().as<pong_processor>();
+
+    multithreaded::connector ping_conn{
+        multithreaded::connector_event_set<ping_event>{}};
+    auto ping_read_port =
+        ping_conn.as_connector_of<ping_event>().get_read_port();
+    auto ping_write_port =
+        ping_conn.as_connector_of<ping_event>().get_write_port();
+
+    multithreaded::connector pong_conn{
+        multithreaded::connector_event_set<pong_event>{}};
+    auto pong_read_port =
+        pong_conn.as_connector_of<pong_event>().get_read_port();
+    auto pong_write_port =
+        pong_conn.as_connector_of<pong_event>().get_write_port();
+
+    EXPECT_EQ(ping_write_port.push(ping_event{}), true);
+
+    casted_ping.add_read_port("pong", std::move(ping_read_port));
+    casted_ping.add_write_port("pong", std::move(pong_write_port));
+
+    casted_pong.add_read_port("ping", std::move(pong_read_port));
+    casted_pong.add_write_port("ping", std::move(ping_write_port));
+
+    std::vector<char*> args{nullptr};
+    e.start(args);
+
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(10ms);
+  }
+  EXPECT_EQ(ping_processor::received_event, true);
+  EXPECT_EQ(pong_processor::received_event, true);
 }

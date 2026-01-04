@@ -6,7 +6,7 @@
 namespace multithreaded::events {
 
 // This is used to determine whether a class is a valid event handler
-struct any_handler {};
+class any_handler {};
 
 template <typename event_t>
 class handler {
