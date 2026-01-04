@@ -9,8 +9,15 @@ jobs:
   ubuntu-build:
     runs-on: ubuntu-24.04
     steps: 
-      - name: Update apt package list 
-        run: sudo apt-get update 
+      - name: Update apt package list & install g++-14
+        run: |
+          sudo apt-get update
+          sudo apt install g++-14 gcc-14 -y
+
+      - name: Set g++-14 as default compiler
+        run: |
+          echo "CXX=g++-14" >> $GITHUB_ENV
+          echo "CC=gcc-14" >> $GITHUB_ENV
       
       - name: Checkout 
         uses: actions/checkout@v4
