@@ -32,7 +32,8 @@ class engine {
     void subscribe_to(const auto& other) const noexcept {
       auto [read_port, write_port] = e_.get().create_connector<event_ts...>();
 
-      p_.get().as<processor_t>().add_read_port(std::move(read_port));
+      p_.get().as<processor_t>().add_read_port(other.name(),
+                                               std::move(read_port));
 
       using other_processor_t =
           typename std::remove_cvref_t<decltype(other)>::type;

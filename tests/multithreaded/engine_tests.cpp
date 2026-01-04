@@ -3,9 +3,12 @@
 #include "engine.hpp"
 #include "events/handler.hpp"
 
+template <typename event_t>
+using envelope = typename multithreaded::events::envelope<event_t>;
+
 TEST(EngineTest, ProcessorRefName) {
   struct mock_processor : public multithreaded::events::handlers<int32_t> {
-    void operator()(const int32_t&) override {}
+    void operator()(const envelope<int32_t>&) override {}
     void on_startup(std::span<char* const>) const noexcept {}
   };
   multithreaded::engine e{};

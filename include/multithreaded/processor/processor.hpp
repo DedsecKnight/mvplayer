@@ -5,7 +5,6 @@
 #include <flat_map>
 #include <span>
 #include <string_view>
-#include <vector>
 
 #include "connector/read/any.hpp"
 #include "connector/read/port.hpp"
@@ -40,32 +39,37 @@ class any_processor {
         : processor_(std::forward<arg_ts>(args)...) {}
 
     template <typename... event_ts>
-    void add_read_port(read::port<event_ts...>&& read_port) {
-      input_queue_.emplace_back(std::move(read_port));
+    void add_read_port(std::string_view sender_name,
+                       read::port<event_ts...>&& read_port) {
+      input_queue_.emplace(sender_name, std::move(read_port));
     }
 
     template <typename... event_ts>
-    void add_write_port(std::string_view sender_name,
+    void add_write_port(std::string_view recipient_name,
                         write::port<event_ts...>&& write_port) {
-      output_queue_.emplace(sender_name, std::move(write_port));
+      output_queue_.emplace(recipient_name, std::move(write_port));
     }
 
     void start_event_loop(std::span<char* const> args) noexcept override {
       processor_.on_startup(args);
+      using envelope_generator_t =
+          typename processor_t::enveloped_event_generator_t;
       using event_holder_t = typename processor_t::event_receiver_t;
       event_holder_t event_holder;
 
       while (!terminated_.load(std::memory_order_relaxed)) {
-        for (auto& rp : input_queue_) {
+        for (auto&& [sender_name, rp] : input_queue_) {
+          envelope_generator_t envelope_generator{sender_name};
           if (rp.get_event(event_holder)) {
-            std::visit(processor_, event_holder);
+            std::visit(envelope_generator, event_holder);
+            std::visit(processor_, envelope_generator.get_enveloped_event());
           }
         }
       }
     }
 
    private:
-    std::vector<read::any> input_queue_;
+    std::flat_map<std::string_view, read::any> input_queue_;
     std::flat_map<std::string_view, write::any> output_queue_;
     std::atomic<bool> terminated_{false};
     processor_t processor_;
