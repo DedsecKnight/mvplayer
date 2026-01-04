@@ -10,6 +10,7 @@
 
 #include "connector/connector.hpp"
 #include "processor/processor.hpp"
+#include "utils/traits.hpp"
 
 namespace multithreaded {
 class engine {
@@ -48,9 +49,9 @@ class engine {
  public:
   void start(std::span<char* const> args) noexcept;
 
-  // TODO: add constraint to allow only event handler as processor_t
   template <typename processor_t, typename... arg_ts>
-    requires std::constructible_from<processor_t, arg_ts...>
+    requires std::constructible_from<processor_t, arg_ts...> &&
+             traits::is_event_handler<processor_t>
   [[nodiscard]] processor_ref<processor_t> create_processor(
       const std::string& processor_name, arg_ts&&... args) noexcept {
     auto [it, _] = processor_registry_.emplace(
