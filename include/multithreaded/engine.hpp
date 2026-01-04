@@ -19,10 +19,13 @@ class engine {
    public:
     using type = processor_t;
     [[nodiscard]] processor_ref(const std::reference_wrapper<any_processor>& p,
-                                const std::reference_wrapper<engine>& e)
-        : p_{p}, e_{e} {}
+                                const std::reference_wrapper<engine>& e,
+                                std::string_view name)
+        : p_{p}, e_{e}, name_{name} {}
 
     any_processor& get() const noexcept { return p_.get(); }
+
+    [[nodiscard]] std::string_view name() const noexcept { return name_; }
 
     template <typename... event_ts>
     void subscribe_to(const auto& other) const noexcept {
@@ -33,12 +36,13 @@ class engine {
       using other_processor_t =
           typename std::remove_cvref_t<decltype(other)>::type;
       other.get().template as<other_processor_t>().add_write_port(
-          std::move(write_port));
+          name_, std::move(write_port));
     }
 
    private:
     std::reference_wrapper<any_processor> p_;
     std::reference_wrapper<engine> e_;
+    std::string_view name_;
   };
 
  public:
@@ -52,7 +56,8 @@ class engine {
     auto [it, _] = processor_registry_.emplace(
         processor_name, processor_t{std::forward<arg_ts>(args)...});
 
-    return processor_ref<processor_t>{std::ref(it->second), std::ref(*this)};
+    return processor_ref<processor_t>{std::ref(it->second), std::ref(*this),
+                                      std::string_view{it->first}};
   }
 
   ~engine() noexcept;
