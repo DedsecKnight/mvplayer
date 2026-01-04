@@ -9,15 +9,12 @@ jobs:
   ubuntu-build:
     runs-on: ubuntu-24.04
     steps: 
-      - name: Update apt package list & install g++-15
-        run: sudo apt-get update && sudo apt install -y gcc-15 g++-15
+      - name: Update apt package list 
+        run: sudo apt-get update 
       
       - name: Checkout 
         uses: actions/checkout@v4
       
-      - name: Configure g++-15
-        run: echo "CXX=g++-15" >> $GITHUB_ENV
-
       - name: Install conan
         uses: conan-io/setup-conan@v1
         with:
