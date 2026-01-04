@@ -13,8 +13,14 @@ class port {
   using queue_elem_t = typename queue_t::elem_t;
 
  public:
-  [[nodiscard]] bool push(const queue_elem_t& elem) noexcept {
-    return queue_.get().push(elem);
+  template <typename event_t>
+  [[nodiscard]] bool push(const event_t& elem) noexcept {
+    if constexpr ((std::is_same_v<event_t, event_ts> || ...)) {
+      queue_elem_holder_ = elem;
+      return queue_.get().push(queue_elem_holder_);
+    } else {
+      return false;
+    }
   }
 
   template <typename... arg_ts>
@@ -26,6 +32,7 @@ class port {
   port(const std::reference_wrapper<queue_t>& queue_ref) : queue_{queue_ref} {}
 
  private:
+  queue_elem_t queue_elem_holder_;
   std::reference_wrapper<queue_t> queue_;
 };
 }  // namespace multithreaded::write

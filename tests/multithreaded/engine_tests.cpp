@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "engine.hpp"
+#include "engine/engine.hpp"
 #include "events/handler.hpp"
 
 template <typename event_t>

@@ -1,10 +1,10 @@
 #pragma once
 
 #include <concepts>
-#include <flat_map>
 #include <functional>
 #include <span>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -55,6 +55,7 @@ class engine {
              traits::is_event_handler<processor_t>
   [[nodiscard]] processor_ref<processor_t> create_processor(
       const std::string& processor_name, arg_ts&&... args) noexcept {
+    // TODO: we can't pass around references like this
     auto [it, _] = processor_registry_.emplace(
         processor_name, processor_t{std::forward<arg_ts>(args)...});
 
@@ -75,7 +76,7 @@ class engine {
 
  private:
   std::vector<std::thread> processor_threads_;
-  std::flat_map<std::string, any_processor> processor_registry_;
+  std::unordered_map<std::string, any_processor> processor_registry_;
   std::vector<connector> connectors_;
 };
 }  // namespace multithreaded

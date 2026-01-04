@@ -1,6 +1,6 @@
 #include <print>
 
-#include "engine.hpp"
+#include "engine/engine.hpp"
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
 
@@ -11,8 +11,8 @@ class ping_processor : public multithreaded::events::handlers<ping_event> {
  public:
   void operator()(
       const multithreaded::events::envelope<ping_event>& e) override {
-    std::println("Received ping event from {}", e.sender_name);
-    // TODO: send back pong event
+    std::println("Received ping event from {}", e.sender().name());
+    e.reply(pong_event{});
   }
   void on_startup(std::span<char* const>) const noexcept {
     std::println("Hi from ping");
@@ -22,7 +22,7 @@ class ping_processor : public multithreaded::events::handlers<ping_event> {
 class pong_processor : public multithreaded::events::handlers<pong_event> {
  public:
   void operator()(const multithreaded::events::envelope<pong_event>& e) {
-    std::println("Received pong event from {}", e.sender_name);
+    std::println("Received pong event from {}", e.sender().name());
     // TODO: send ping event
   }
   void on_startup(std::span<char* const>) const noexcept {

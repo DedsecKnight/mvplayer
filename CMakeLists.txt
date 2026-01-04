@@ -47,7 +47,7 @@ target_sources(
 target_sources(
   multithreaded
   PRIVATE
-    src/multithreaded/engine.cpp
+    src/multithreaded/engine/engine.cpp
 
   PUBLIC
     FILE_SET multithreadedHeaders
@@ -55,7 +55,7 @@ target_sources(
     BASE_DIRS
       include/multithreaded
     FILES
-      include/multithreaded/engine.hpp
+      include/multithreaded/engine/engine.hpp
       include/multithreaded/utils/queue.hpp
 )
 
