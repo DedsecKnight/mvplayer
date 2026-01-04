@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <concepts>
+#include <flat_map>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -44,8 +45,9 @@ class any_processor {
     }
 
     template <typename... event_ts>
-    void add_write_port(write::port<event_ts...>&& write_port) {
-      output_queue_.emplace_back(std::move(write_port));
+    void add_write_port(std::string_view sender_name,
+                        write::port<event_ts...>&& write_port) {
+      output_queue_.emplace(sender_name, std::move(write_port));
     }
 
     void start_event_loop(std::span<char* const> args) noexcept override {
@@ -64,7 +66,7 @@ class any_processor {
 
    private:
     std::vector<read::any> input_queue_;
-    std::vector<write::any> output_queue_;
+    std::flat_map<std::string_view, write::any> output_queue_;
     std::atomic<bool> terminated_{false};
     processor_t processor_;
   };
