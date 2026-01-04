@@ -7,10 +7,10 @@ on:
 
 jobs:
   ubuntu-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps: 
       - name: Update apt package list & install g++-15
-        run: sudo apt-get update && sudo apt install -y gcc-15 g++15
+        run: sudo apt-get update && sudo apt install -y gcc-15 g++-15
       
       - name: Checkout 
         uses: actions/checkout@v4
