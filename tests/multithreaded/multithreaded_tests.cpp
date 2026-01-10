@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <thread>
 #include <variant>
 
 #include "connector/connector.hpp"
@@ -12,8 +13,11 @@ struct mock_event {
   event_t x{};
 };
 
+struct mock_terminate_event {};
+
 struct mock_processor
-    : public multithreaded::events::handlers<mock_event<int32_t>> {
+    : public multithreaded::events::handlers<mock_event<int32_t>,
+                                             mock_terminate_event> {
   template <typename event_t>
   using envelope = typename multithreaded::events::envelope<event_t>;
 
@@ -22,6 +26,12 @@ struct mock_processor
     senders.push_back(e.sender().name());
     received_payload.push_back(e.payload().x);
   }
+
+  void operator()(const envelope<mock_terminate_event>& e) override {
+    event_received = true;
+    EXPECT_EQ(request_termination(), true);
+  }
+
   void on_startup(std::span<char* const>) const noexcept {}
 
   static bool event_received;
@@ -89,25 +99,27 @@ bool pong_processor::received_event = false;
 
 TEST(MultithreadedTests, HandleEmptyMessage) {
   using event_t = mock_event<int32_t>;
-  {
-    multithreaded::engine e{};
-    using namespace std::literals;
-    multithreaded::connector conn{
-        multithreaded::connector_event_set<event_t>{}};
-    auto read_port = conn.as_connector_of<event_t>().get_read_port();
-    auto write_port = conn.as_connector_of<event_t>().get_write_port();
-
-    auto p1 = e.create_processor<mock_processor>("p1");
-    auto& casted_p1 = p1.get().as<mock_processor>();
-    casted_p1.add_read_port("", std::move(read_port));
-
-    std::vector<char*> args{nullptr};
-    e.start(args);
-
-    EXPECT_EQ(write_port.push(event_t{}), true);
-
+  multithreaded::engine e{};
+  std::thread engine_stopper{[&e]() {
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(5ms);
+    e.terminate();
+  }};
+  using namespace std::literals;
+  multithreaded::connector conn{multithreaded::connector_event_set<event_t>{}};
+  auto read_port = conn.as_connector_of<event_t>().get_read_port();
+  auto write_port = conn.as_connector_of<event_t>().get_write_port();
+
+  auto p1 = e.create_processor<mock_processor>("p1");
+  auto& casted_p1 = p1.get().as<mock_processor>();
+  casted_p1.add_read_port("", std::move(read_port));
+
+  std::vector<char*> args{nullptr};
+  EXPECT_EQ(write_port.push(event_t{}), true);
+
+  e.start(args);
+  if (engine_stopper.joinable()) {
+    engine_stopper.join();
   }
 
   EXPECT_EQ(mock_processor::event_received, true);
@@ -115,27 +127,28 @@ TEST(MultithreadedTests, HandleEmptyMessage) {
 
 TEST(MultithreadedTests, HandleNonEmptyMessage) {
   using event_t = mock_event<int32_t>;
-  {
-    mock_processor::event_received = false;
-    mock_processor::received_payload.clear();
-    multithreaded::engine e{};
-    using namespace std::literals;
-    multithreaded::connector conn{
-        multithreaded::connector_event_set<event_t>{}};
-    auto read_port = conn.as_connector_of<event_t>().get_read_port();
-    auto write_port = conn.as_connector_of<event_t>().get_write_port();
-
-    auto p1 = e.create_processor<mock_processor>("p1");
-    auto& casted_p1 = p1.get().as<mock_processor>();
-    casted_p1.add_read_port("", std::move(read_port));
-
-    std::vector<char*> args{nullptr};
-    e.start(args);
-
-    EXPECT_EQ(write_port.push(event_t{5}), true);
-
+  mock_processor::event_received = false;
+  mock_processor::received_payload.clear();
+  multithreaded::engine e{};
+  std::thread engine_stopper{[&e]() {
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(5ms);
+    e.terminate();
+  }};
+  using namespace std::literals;
+  multithreaded::connector conn{multithreaded::connector_event_set<event_t>{}};
+  auto read_port = conn.as_connector_of<event_t>().get_read_port();
+  auto write_port = conn.as_connector_of<event_t>().get_write_port();
+
+  auto p1 = e.create_processor<mock_processor>("p1");
+  auto& casted_p1 = p1.get().as<mock_processor>();
+  casted_p1.add_read_port("", std::move(read_port));
+
+  std::vector<char*> args{nullptr};
+  EXPECT_EQ(write_port.push(event_t{5}), true);
+  e.start(args);
+  if (engine_stopper.joinable()) {
+    engine_stopper.join();
   }
 
   EXPECT_EQ(mock_processor::event_received, true);
@@ -144,33 +157,37 @@ TEST(MultithreadedTests, HandleNonEmptyMessage) {
 }
 
 TEST(MultithreadedTests, ProcessorWithMultipleEventHandlers) {
-  {
-    variadic_mock_processor::event_received = false;
-    variadic_mock_processor::received_payload.clear();
-    multithreaded::engine e{};
-    using namespace std::literals;
-    multithreaded::connector conn{
-        multithreaded::connector_event_set<mock_event<int32_t>,
-                                           mock_event<double>>{}};
-    auto read_port =
-        conn.as_connector_of<mock_event<int32_t>, mock_event<double>>()
-            .get_read_port();
-    auto write_port =
-        conn.as_connector_of<mock_event<int32_t>, mock_event<double>>()
-            .get_write_port();
-
-    auto p1 = e.create_processor<variadic_mock_processor>("p1");
-    auto& casted_p1 = p1.get().as<variadic_mock_processor>();
-    casted_p1.add_read_port("", std::move(read_port));
-
-    std::vector<char*> args{nullptr};
-    e.start(args);
-
-    EXPECT_EQ(write_port.push(mock_event<int32_t>{5}), true);
-    EXPECT_EQ(write_port.push(mock_event<double>{2.0}), true);
-
+  variadic_mock_processor::event_received = false;
+  variadic_mock_processor::received_payload.clear();
+  multithreaded::engine e{};
+  std::thread engine_stopper{[&e]() {
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(10ms);
+    e.terminate();
+  }};
+  using namespace std::literals;
+  multithreaded::connector conn{
+      multithreaded::connector_event_set<mock_event<int32_t>,
+                                         mock_event<double>>{}};
+  auto read_port =
+      conn.as_connector_of<mock_event<int32_t>, mock_event<double>>()
+          .get_read_port();
+  auto write_port =
+      conn.as_connector_of<mock_event<int32_t>, mock_event<double>>()
+          .get_write_port();
+
+  auto p1 = e.create_processor<variadic_mock_processor>("p1");
+  auto& casted_p1 = p1.get().as<variadic_mock_processor>();
+  casted_p1.add_read_port("", std::move(read_port));
+
+  EXPECT_EQ(write_port.push(mock_event<int32_t>{5}), true);
+  EXPECT_EQ(write_port.push(mock_event<double>{2.0}), true);
+
+  std::vector<char*> args{nullptr};
+  e.start(args);
+
+  if (engine_stopper.joinable()) {
+    engine_stopper.join();
   }
 
   EXPECT_EQ(variadic_mock_processor::event_received, true);
@@ -182,28 +199,29 @@ TEST(MultithreadedTests, ProcessorWithMultipleEventHandlers) {
 
 TEST(MultithreadedTests, TestRecipientName) {
   using event_t = mock_event<int32_t>;
-  {
-    mock_processor::event_received = false;
-    mock_processor::received_payload.clear();
-    mock_processor::senders.clear();
-    multithreaded::engine e{};
-    using namespace std::literals;
-    multithreaded::connector conn{
-        multithreaded::connector_event_set<event_t>{}};
-    auto read_port = conn.as_connector_of<event_t>().get_read_port();
-    auto write_port = conn.as_connector_of<event_t>().get_write_port();
-
-    auto p1 = e.create_processor<mock_processor>("p1");
-    auto& casted_p1 = p1.get().as<mock_processor>();
-    casted_p1.add_read_port("main-thread", std::move(read_port));
-
-    std::vector<char*> args{nullptr};
-    e.start(args);
-
-    EXPECT_EQ(write_port.push(event_t{5}), true);
-
+  mock_processor::event_received = false;
+  mock_processor::received_payload.clear();
+  mock_processor::senders.clear();
+  multithreaded::engine e{};
+  std::thread engine_stopper{[&e]() {
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(5ms);
+    e.terminate();
+  }};
+  using namespace std::literals;
+  multithreaded::connector conn{multithreaded::connector_event_set<event_t>{}};
+  auto read_port = conn.as_connector_of<event_t>().get_read_port();
+  auto write_port = conn.as_connector_of<event_t>().get_write_port();
+
+  auto p1 = e.create_processor<mock_processor>("p1");
+  auto& casted_p1 = p1.get().as<mock_processor>();
+  casted_p1.add_read_port("main-thread", std::move(read_port));
+
+  std::vector<char*> args{nullptr};
+  EXPECT_EQ(write_port.push(event_t{5}), true);
+  e.start(args);
+  if (engine_stopper.joinable()) {
+    engine_stopper.join();
   }
 
   EXPECT_EQ(mock_processor::senders.size(), 1);
@@ -211,88 +229,116 @@ TEST(MultithreadedTests, TestRecipientName) {
 }
 
 TEST(MultithreadedTests, TestReplyMechanism) {
-  {
-    ping_processor::received_event = false;
-    pong_processor::received_event = false;
+  ping_processor::received_event = false;
+  pong_processor::received_event = false;
 
-    multithreaded::engine e{};
-    using namespace std::literals;
-
-    auto ping = e.create_processor<ping_processor>("ping");
-    auto pong = e.create_processor<pong_processor>("pong");
-    auto& casted_ping = ping.get().as<ping_processor>();
-    auto& casted_pong = pong.get().as<pong_processor>();
-
-    multithreaded::connector ping_conn{
-        multithreaded::connector_event_set<ping_event>{}};
-    auto ping_read_port =
-        ping_conn.as_connector_of<ping_event>().get_read_port();
-    auto ping_write_port =
-        ping_conn.as_connector_of<ping_event>().get_write_port();
-
-    multithreaded::connector pong_conn{
-        multithreaded::connector_event_set<pong_event>{}};
-    auto pong_read_port =
-        pong_conn.as_connector_of<pong_event>().get_read_port();
-    auto pong_write_port =
-        pong_conn.as_connector_of<pong_event>().get_write_port();
-
-    EXPECT_EQ(ping_write_port.push(ping_event{}), true);
-
-    casted_ping.add_read_port("pong", std::move(ping_read_port));
-    casted_ping.add_write_port("pong", std::move(pong_write_port));
-
-    casted_pong.add_read_port("ping", std::move(pong_read_port));
-    casted_pong.add_write_port("ping", std::move(ping_write_port));
-
-    std::vector<char*> args{nullptr};
-    e.start(args);
-
+  multithreaded::engine e{};
+  std::thread engine_stopper{[&e]() {
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(10ms);
+    e.terminate();
+  }};
+  using namespace std::literals;
+
+  auto ping = e.create_processor<ping_processor>("ping");
+  auto pong = e.create_processor<pong_processor>("pong");
+  auto& casted_ping = ping.get().as<ping_processor>();
+  auto& casted_pong = pong.get().as<pong_processor>();
+
+  multithreaded::connector ping_conn{
+      multithreaded::connector_event_set<ping_event>{}};
+  auto ping_read_port = ping_conn.as_connector_of<ping_event>().get_read_port();
+  auto ping_write_port =
+      ping_conn.as_connector_of<ping_event>().get_write_port();
+
+  multithreaded::connector pong_conn{
+      multithreaded::connector_event_set<pong_event>{}};
+  auto pong_read_port = pong_conn.as_connector_of<pong_event>().get_read_port();
+  auto pong_write_port =
+      pong_conn.as_connector_of<pong_event>().get_write_port();
+
+  EXPECT_EQ(ping_write_port.push(ping_event{}), true);
+
+  casted_ping.add_read_port("pong", std::move(ping_read_port));
+  casted_ping.add_write_port("pong", std::move(pong_write_port));
+
+  casted_pong.add_read_port("ping", std::move(pong_read_port));
+  casted_pong.add_write_port("ping", std::move(ping_write_port));
+
+  std::vector<char*> args{nullptr};
+  e.start(args);
+  if (engine_stopper.joinable()) {
+    engine_stopper.join();
   }
+
   EXPECT_EQ(ping_processor::received_event, true);
   EXPECT_EQ(pong_processor::received_event, true);
 }
 
 TEST(MultithreadedTests, TestBroadcastMechanism) {
-  {
-    ping_processor::received_event = false;
-    pong_processor::received_event = false;
-    multithreaded::engine e{};
-    using namespace std::literals;
-
-    auto ping = e.create_processor<ping_processor>("ping");
-    auto pong = e.create_processor<pong_processor>("pong");
-    auto& casted_ping = ping.get().as<ping_processor>();
-    auto& casted_pong = pong.get().as<pong_processor>();
-
-    multithreaded::connector ping_conn{
-        multithreaded::connector_event_set<ping_event>{}};
-    auto ping_read_port =
-        ping_conn.as_connector_of<ping_event>().get_read_port();
-    auto ping_write_port =
-        ping_conn.as_connector_of<ping_event>().get_write_port();
-
-    multithreaded::connector pong_conn{
-        multithreaded::connector_event_set<pong_event>{}};
-    auto pong_read_port =
-        pong_conn.as_connector_of<pong_event>().get_read_port();
-    auto pong_write_port =
-        pong_conn.as_connector_of<pong_event>().get_write_port();
-
-    casted_ping.add_read_port("pong", std::move(ping_read_port));
-    casted_ping.add_write_port("pong", std::move(pong_write_port));
-
-    casted_pong.add_read_port("ping", std::move(pong_read_port));
-    casted_pong.add_write_port("ping", std::move(ping_write_port));
-
-    std::vector<char*> args{};
-    e.start(args);
-
+  ping_processor::received_event = false;
+  pong_processor::received_event = false;
+  multithreaded::engine e{};
+  std::thread engine_stopper{[&e]() {
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(10ms);
+    e.terminate();
+  }};
+  using namespace std::literals;
+
+  auto ping = e.create_processor<ping_processor>("ping");
+  auto pong = e.create_processor<pong_processor>("pong");
+  auto& casted_ping = ping.get().as<ping_processor>();
+  auto& casted_pong = pong.get().as<pong_processor>();
+
+  multithreaded::connector ping_conn{
+      multithreaded::connector_event_set<ping_event>{}};
+  auto ping_read_port = ping_conn.as_connector_of<ping_event>().get_read_port();
+  auto ping_write_port =
+      ping_conn.as_connector_of<ping_event>().get_write_port();
+
+  multithreaded::connector pong_conn{
+      multithreaded::connector_event_set<pong_event>{}};
+  auto pong_read_port = pong_conn.as_connector_of<pong_event>().get_read_port();
+  auto pong_write_port =
+      pong_conn.as_connector_of<pong_event>().get_write_port();
+
+  casted_ping.add_read_port("pong", std::move(ping_read_port));
+  casted_ping.add_write_port("pong", std::move(pong_write_port));
+
+  casted_pong.add_read_port("ping", std::move(pong_read_port));
+  casted_pong.add_write_port("ping", std::move(ping_write_port));
+
+  std::vector<char*> args{};
+  e.start(args);
+  if (engine_stopper.joinable()) {
+    engine_stopper.join();
   }
+
   EXPECT_EQ(ping_processor::received_event, true);
   EXPECT_EQ(pong_processor::received_event, true);
+}
+
+TEST(MultithreadedTests, TestRequestTermination) {
+  mock_processor::event_received = false;
+  mock_processor::received_payload.clear();
+  mock_processor::senders.clear();
+  multithreaded::engine e{};
+  using namespace std::literals;
+  multithreaded::connector conn{
+      multithreaded::connector_event_set<mock_terminate_event>{}};
+  auto read_port = conn.as_connector_of<mock_terminate_event>().get_read_port();
+  auto write_port =
+      conn.as_connector_of<mock_terminate_event>().get_write_port();
+
+  auto p1 = e.create_processor<mock_processor>("p1");
+  auto& casted_p1 = p1.get().as<mock_processor>();
+  casted_p1.add_read_port("main-thread", std::move(read_port));
+
+  std::vector<char*> args{nullptr};
+  EXPECT_EQ(write_port.push(mock_terminate_event{}), true);
+
+  e.start(args);
+  EXPECT_EQ(e.terminated(), true);
+  EXPECT_EQ(mock_processor::event_received, true);
 }

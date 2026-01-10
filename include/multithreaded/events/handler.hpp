@@ -5,7 +5,9 @@
 
 #include "connector/read/any.hpp"
 #include "connector/write/any.hpp"
+#include "engine/utils.hpp"
 #include "events/envelope.hpp"
+
 namespace multithreaded::events {
 
 class any_handler {
@@ -34,6 +36,11 @@ class any_handler {
         spdlog::trace("Sucessfully sent event to {}", recipient_name);
       }
     }
+  }
+
+  [[nodiscard]] bool request_termination() noexcept {
+    return output_queue_.at(constants::ENGINE_IDENTIFIER)
+        .send_event(system_events::system_terminate_request_event{});
   }
 
  private:
