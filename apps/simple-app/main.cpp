@@ -14,8 +14,9 @@ class ping_processor : public multithreaded::events::handlers<ping_event> {
     std::println("Received ping event from {}", e.sender().name());
     e.reply(pong_event{});
   }
-  void on_startup(std::span<char* const>) const noexcept {
+  void on_startup(std::span<char* const>) noexcept {
     std::println("Hi from ping");
+    event_handler_t::broadcast(pong_event{});
   }
 };
 

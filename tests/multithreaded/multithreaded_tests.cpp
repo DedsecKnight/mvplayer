@@ -76,7 +76,11 @@ struct pong_processor : public multithreaded::events::handlers<pong_event> {
   void operator()(const multithreaded::events::envelope<pong_event>&) {
     received_event = true;
   }
-  void on_startup(std::span<char* const>) const noexcept {}
+  void on_startup(std::span<char* const> args) noexcept {
+    if (args.empty()) {
+      broadcast(ping_event{});
+    }
+  }
   static bool received_event;
 };
 
@@ -208,6 +212,9 @@ TEST(MultithreadedTests, TestRecipientName) {
 
 TEST(MultithreadedTests, TestReplyMechanism) {
   {
+    ping_processor::received_event = false;
+    pong_processor::received_event = false;
+
     multithreaded::engine e{};
     using namespace std::literals;
 
@@ -239,6 +246,48 @@ TEST(MultithreadedTests, TestReplyMechanism) {
     casted_pong.add_write_port("ping", std::move(ping_write_port));
 
     std::vector<char*> args{nullptr};
+    e.start(args);
+
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(10ms);
+  }
+  EXPECT_EQ(ping_processor::received_event, true);
+  EXPECT_EQ(pong_processor::received_event, true);
+}
+
+TEST(MultithreadedTests, TestBroadcastMechanism) {
+  {
+    ping_processor::received_event = false;
+    pong_processor::received_event = false;
+    multithreaded::engine e{};
+    using namespace std::literals;
+
+    auto ping = e.create_processor<ping_processor>("ping");
+    auto pong = e.create_processor<pong_processor>("pong");
+    auto& casted_ping = ping.get().as<ping_processor>();
+    auto& casted_pong = pong.get().as<pong_processor>();
+
+    multithreaded::connector ping_conn{
+        multithreaded::connector_event_set<ping_event>{}};
+    auto ping_read_port =
+        ping_conn.as_connector_of<ping_event>().get_read_port();
+    auto ping_write_port =
+        ping_conn.as_connector_of<ping_event>().get_write_port();
+
+    multithreaded::connector pong_conn{
+        multithreaded::connector_event_set<pong_event>{}};
+    auto pong_read_port =
+        pong_conn.as_connector_of<pong_event>().get_read_port();
+    auto pong_write_port =
+        pong_conn.as_connector_of<pong_event>().get_write_port();
+
+    casted_ping.add_read_port("pong", std::move(ping_read_port));
+    casted_ping.add_write_port("pong", std::move(pong_write_port));
+
+    casted_pong.add_read_port("ping", std::move(pong_read_port));
+    casted_pong.add_write_port("ping", std::move(ping_write_port));
+
+    std::vector<char*> args{};
     e.start(args);
 
     using namespace std::chrono_literals;

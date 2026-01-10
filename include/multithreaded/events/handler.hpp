@@ -1,12 +1,45 @@
 #pragma once
 
+#include <unordered_map>
 #include <variant>
 
+#include "connector/read/any.hpp"
+#include "connector/write/any.hpp"
 #include "events/envelope.hpp"
 namespace multithreaded::events {
 
-// This is used to determine whether a class is a valid event handler
-class any_handler {};
+class any_handler {
+ public:
+  template <typename... event_ts>
+  void add_read_port(std::string_view sender_name,
+                     read::port<event_ts...>&& read_port) {
+    input_queue_.emplace(sender_name, std::move(read_port));
+  }
+
+  template <typename... event_ts>
+  void add_write_port(std::string_view recipient_name,
+                      write::port<event_ts...>&& write_port) {
+    output_queue_.emplace(recipient_name, std::move(write_port));
+  }
+
+  [[nodiscard]] auto input_queues() noexcept { return std::ref(input_queue_); }
+  [[nodiscard]] auto output_queues() noexcept {
+    return std::ref(output_queue_);
+  }
+
+  template <typename event_t>
+  void broadcast(const event_t& e) noexcept {
+    for (auto&& [recipient_name, wp] : output_queue_) {
+      if (wp.send_event(e)) {
+        spdlog::trace("Sucessfully sent event to {}", recipient_name);
+      }
+    }
+  }
+
+ private:
+  std::unordered_map<std::string_view, read::any> input_queue_;
+  std::unordered_map<std::string_view, write::any> output_queue_;
+};
 
 template <typename event_t>
 class handler {

@@ -2,11 +2,9 @@
 
 #include <atomic>
 #include <concepts>
-#include <flat_map>
 #include <span>
 #include <string_view>
 
-#include "connector/read/any.hpp"
 #include "connector/read/port.hpp"
 #include "connector/write/any.hpp"
 #include "connector/write/port.hpp"
@@ -41,13 +39,13 @@ class any_processor {
     template <typename... event_ts>
     void add_read_port(std::string_view sender_name,
                        read::port<event_ts...>&& read_port) {
-      input_queue_.emplace(sender_name, std::move(read_port));
+      processor_.add_read_port(sender_name, std::move(read_port));
     }
 
     template <typename... event_ts>
     void add_write_port(std::string_view recipient_name,
                         write::port<event_ts...>&& write_port) {
-      output_queue_.emplace(recipient_name, std::move(write_port));
+      processor_.add_write_port(recipient_name, std::move(write_port));
     }
 
     void start_event_loop(std::span<char* const> args) noexcept override {
@@ -58,10 +56,11 @@ class any_processor {
       event_holder_t event_holder;
 
       while (!terminated_.load(std::memory_order_relaxed)) {
-        for (auto&& [sender_name, rp] : input_queue_) {
+        auto& output_queues = processor_.output_queues().get();
+        for (auto&& [sender_name, rp] : processor_.input_queues().get()) {
           write::any* sender_mailbox{nullptr};
-          auto it = output_queue_.find(sender_name);
-          if (it != output_queue_.end()) {
+          auto it = output_queues.find(sender_name);
+          if (it != output_queues.end()) {
             sender_mailbox = &it->second;
           }
           envelope_generator_t envelope_generator{sender_name, sender_mailbox};
@@ -74,8 +73,6 @@ class any_processor {
     }
 
    private:
-    std::flat_map<std::string_view, read::any> input_queue_;
-    std::flat_map<std::string_view, write::any> output_queue_;
     std::atomic<bool> terminated_{false};
     processor_t processor_;
   };
