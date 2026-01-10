@@ -1,8 +1,11 @@
 #include <print>
+#include <thread>
 
 #include "engine/engine.hpp"
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
+
+using namespace std::chrono_literals;
 
 struct ping_event {};
 struct pong_event {};
@@ -11,24 +14,26 @@ class ping_processor : public multithreaded::events::handlers<ping_event> {
  public:
   void operator()(
       const multithreaded::events::envelope<ping_event>& e) override {
-    std::println("Received ping event from {}", e.sender().name());
+    std::println("[{}] Received ping event from {}", std::this_thread::get_id(),
+                 e.sender().name());
     e.reply(pong_event{});
   }
   void on_startup(std::span<char* const>) noexcept {
     std::println("Hi from ping");
-    event_handler_t::broadcast(pong_event{});
   }
 };
 
 class pong_processor : public multithreaded::events::handlers<pong_event> {
  public:
   void operator()(const multithreaded::events::envelope<pong_event>& e) {
-    std::println("Received pong event from {}", e.sender().name());
-    // TODO: send ping event
+    std::println("[{}] Received pong event from {}", std::this_thread::get_id(),
+                 e.sender().name());
+    std::this_thread::sleep_for(5s);
+    e.reply(ping_event{});
   }
-  void on_startup(std::span<char* const>) const noexcept {
-    // TODO: send ping event
+  void on_startup(std::span<char* const>) noexcept {
     std::println("Hi from pong");
+    broadcast(ping_event{});
   }
 };
 
