@@ -28,7 +28,7 @@ class pong_processor : public multithreaded::events::handlers<pong_event> {
   void operator()(const multithreaded::events::envelope<pong_event>& e) {
     std::println("[{}] Received pong event from {}", std::this_thread::get_id(),
                  e.sender().name());
-    std::this_thread::sleep_for(5s);
+    std::this_thread::sleep_for(1s);
     e.reply(ping_event{});
   }
   void on_startup(std::span<char* const>) noexcept {
@@ -47,8 +47,4 @@ int main(int argc, char** argv) {
   p1.subscribe_to<ping_event>(p2);
 
   e.start(std::span(argv, argc));
-
-  // TODO: implement stop mechanism
-  while (true) {
-  }
 }

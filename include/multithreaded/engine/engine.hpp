@@ -9,10 +9,12 @@
 #include <vector>
 
 #include "connector/connector.hpp"
+#include "engine/utils.hpp"
 #include "processor/processor.hpp"
 #include "utils/traits.hpp"
 
 namespace multithreaded {
+
 class engine {
  private:
   template <typename processor_t>
@@ -59,8 +61,17 @@ class engine {
     auto [it, _] = processor_registry_.emplace(
         processor_name, processor_t{std::forward<arg_ts>(args)...});
 
+    inject_system_event_writer<processor_t>(it->second);
+
     return processor_ref<processor_t>{std::ref(it->second), std::ref(*this),
                                       std::string_view{it->first}};
+  }
+
+  [[nodiscard]] bool terminated() const noexcept {
+    return is_terminated_.load(std::memory_order_relaxed);
+  }
+  void terminate() noexcept {
+    is_terminated_.store(true, std::memory_order_relaxed);
   }
 
   ~engine() noexcept;
@@ -74,9 +85,21 @@ class engine {
                           event_connector.get_write_port());
   }
 
+  template <typename processor_t>
+  void inject_system_event_writer(any_processor& processor) {
+    auto [read_port, write_port] =
+        create_connector<system_events::system_terminate_request_event>();
+    system_event_read_ports_.emplace_back(std::move(read_port));
+    processor.as<processor_t>().add_write_port(constants::ENGINE_IDENTIFIER,
+                                               std::move(write_port));
+  }
+
  private:
   std::vector<std::thread> processor_threads_;
   std::unordered_map<std::string, any_processor> processor_registry_;
   std::vector<connector> connectors_;
+  std::vector<read::port<system_events::system_terminate_request_event>>
+      system_event_read_ports_;
+  std::atomic<bool> is_terminated_{false};
 };
 }  // namespace multithreaded

@@ -18,6 +18,7 @@ class any_processor {
   struct processor_concept {
     virtual ~processor_concept() = default;
     virtual void start_event_loop(std::span<char* const> args) noexcept = 0;
+    [[nodiscard]] virtual bool terminated() const noexcept = 0;
     virtual void terminate() noexcept = 0;
   };
 
@@ -29,6 +30,10 @@ class any_processor {
    public:
     void terminate() noexcept override {
       terminated_.store(true, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] bool terminated() const noexcept override {
+      return terminated_.load(std::memory_order_relaxed);
     }
 
     template <typename... arg_ts>
@@ -99,6 +104,9 @@ class any_processor {
   }
 
   void terminate() noexcept { pimpl_->terminate(); }
+  [[nodiscard]] bool terminated() const noexcept {
+    return pimpl_->terminated();
+  }
 
  private:
   std::unique_ptr<processor_concept> pimpl_;
