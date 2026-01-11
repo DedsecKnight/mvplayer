@@ -1,7 +1,6 @@
 #include "engine/engine.hpp"
 
 #include <atomic>
-#include <csignal>
 #include <variant>
 
 #include "processor/processor.hpp"
@@ -14,15 +13,16 @@ engine::~engine() noexcept {
       processor.terminate();
     }
   }
-  for (auto& pt : processor_threads_) {
-    if (pt.joinable()) {
-      pt.join();
+  for (auto& processor_thread : processor_threads_) {
+    if (processor_thread.joinable()) {
+      processor_thread.join();
     }
   }
 }
 
 void engine::start(std::span<char* const> args) noexcept {
-  for (const auto& [_, processor] : processor_registry_) {
+  for (const auto& [processor_name, processor] : processor_registry_) {
+    spdlog::info("Starting {}", processor_name);
     processor_threads_.emplace_back(&any_processor::start, &processor, args);
   }
   while (!is_terminated_.load(std::memory_order_relaxed)) {
@@ -37,7 +37,8 @@ void engine::start(std::span<char* const> args) noexcept {
         spdlog::info(
             "Received terminate request. Sending terminate signal to all "
             "processors.");
-        for (auto&& [_, processor] : processor_registry_) {
+        for (auto&& [processor_name, processor] : processor_registry_) {
+          spdlog::info("Sending termination signal to {}", processor_name);
           processor.terminate();
         }
         is_terminated_.store(true, std::memory_order_relaxed);
