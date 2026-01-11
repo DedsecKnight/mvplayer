@@ -8,12 +8,15 @@ namespace mvplayer {
 class sdl_manager {
  public:
   [[nodiscard]] static sdl_manager& get_instance() {
-    static sdl_manager s;
-    return s;
+    static sdl_manager manager{};
+    return manager;
   }
 
   sdl_manager(const sdl_manager&) = delete;
   sdl_manager& operator=(const sdl_manager&) = delete;
+
+  sdl_manager(sdl_manager&&) = delete;
+  sdl_manager& operator=(sdl_manager&&) = delete;
 
   [[nodiscard]] static sdl_window create_window(std::string_view window_name,
                                                 int width,
@@ -35,17 +38,21 @@ class sdl_manager {
   }
 
  private:
+  // NOLINTNEXTLINE
   [[nodiscard]] sdl_window new_window(std::string_view window_name, int width,
-                                      int height) noexcept {
+                                      int height) {
+    std::string safe_window_name{window_name};
     return sdl_window{
-        SDL_CreateWindow(window_name.data(), width, height,
+        SDL_CreateWindow(safe_window_name.c_str(), width, height,
                          SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS)};
   }
 
+  // NOLINTNEXTLINE
   [[nodiscard]] sdl_renderer new_renderer(SDL_Window* window) noexcept {
     return sdl_renderer{SDL_CreateRenderer(window, nullptr)};
   }
 
+  // NOLINTNEXTLINE
   [[nodiscard]] sdl_texture new_texture(SDL_Renderer* renderer,
                                         SDL_PixelFormat pixel_format,
                                         SDL_TextureAccess texture_access,
@@ -55,7 +62,6 @@ class sdl_manager {
                                          width, height)};
   }
 
- private:
   sdl_manager() { SDL_Init(SDL_INIT_VIDEO); }
   ~sdl_manager() { SDL_Quit(); }
 };

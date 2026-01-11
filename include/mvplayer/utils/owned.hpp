@@ -28,22 +28,22 @@ namespace details {
                                                                         \
    public:                                                              \
     using BaseType::unique_ptr;                                         \
-    [[nodiscard]] Owned##RESOURCE(RESOURCE* r)                          \
-        : BaseType{r, deallocator::RESOURCE##Deallocator} {}            \
+    [[nodiscard]] explicit Owned##RESOURCE(RESOURCE* raw_resource)      \
+        : BaseType{raw_resource, deallocator::RESOURCE##Deallocator} {} \
   };
 
-#define OWNED_SDL_RESOURCE(RESOURCE)                                       \
-  class OwnedSdl##RESOURCE                                                 \
-      : public std::unique_ptr<SDL_##RESOURCE,                             \
-                               decltype(&SDL_Destroy##RESOURCE)> {         \
-   private:                                                                \
-    using BaseType =                                                       \
-        std::unique_ptr<SDL_##RESOURCE, decltype(&SDL_Destroy##RESOURCE)>; \
-                                                                           \
-   public:                                                                 \
-    using BaseType::unique_ptr;                                            \
-    [[nodiscard]] OwnedSdl##RESOURCE(SDL_##RESOURCE* r)                    \
-        : BaseType{r, SDL_Destroy##RESOURCE} {}                            \
+#define OWNED_SDL_RESOURCE(RESOURCE)                                        \
+  class OwnedSdl##RESOURCE                                                  \
+      : public std::unique_ptr<SDL_##RESOURCE,                              \
+                               decltype(&SDL_Destroy##RESOURCE)> {          \
+   private:                                                                 \
+    using BaseType =                                                        \
+        std::unique_ptr<SDL_##RESOURCE, decltype(&SDL_Destroy##RESOURCE)>;  \
+                                                                            \
+   public:                                                                  \
+    using BaseType::unique_ptr;                                             \
+    [[nodiscard]] explicit OwnedSdl##RESOURCE(SDL_##RESOURCE* raw_resource) \
+        : BaseType{raw_resource, SDL_Destroy##RESOURCE} {}                  \
   };
 
 OWNED_FFMPEG_RESOURCE(AVFrame)
