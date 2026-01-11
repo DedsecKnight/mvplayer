@@ -29,7 +29,8 @@ class port {
     return queue_.get().emplace(std::forward<arg_ts>(args)...);
   }
 
-  port(const std::reference_wrapper<queue_t>& queue_ref) : queue_{queue_ref} {}
+  explicit port(const std::reference_wrapper<queue_t>& queue_ref)
+      : queue_{queue_ref} {}
 
  private:
   queue_elem_t queue_elem_holder_;

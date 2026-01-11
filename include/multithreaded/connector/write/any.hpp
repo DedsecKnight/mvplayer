@@ -7,25 +7,24 @@
 namespace multithreaded::write {
 class any {
  private:
-  struct port_concept {
-    virtual ~port_concept() = default;
+  struct container {  // NOLINT
+    virtual ~container() = default;
 
     template <typename event_t>
-    [[nodiscard]] bool send_event(const event_t& e) noexcept {
+    [[nodiscard]] bool send_event(const event_t& event) noexcept {
       auto event_port_ptr = dynamic_cast<event_port<event_t>*>(this);
       if (!event_port_ptr) {
         return false;
       }
-      return event_port_ptr->send_event(e);
+      return event_port_ptr->send_event(event);
     }
   };
 
   template <typename... event_ts>
-  class port_model
-      : public port_concept,
-        public event_port_impl<port_model<event_ts...>, event_ts>... {
+  class model : public container,
+                public event_port_impl<model<event_ts...>, event_ts>... {
    public:
-    port_model(port<event_ts...>&& wport) : write_port_{std::move(wport)} {}
+    explicit model(port<event_ts...>&& wport) : write_port_{std::move(wport)} {}
 
     template <typename event_t>
     [[nodiscard]] bool push(const event_t& elem) noexcept {
@@ -48,16 +47,16 @@ class any {
     port<event_ts...> write_port_;
   };
 
-  std::unique_ptr<port_concept> pimpl_;
+  std::unique_ptr<container> pimpl_;
 
  public:
   template <typename... event_ts>
-  any(port<event_ts...>&& wport)
-      : pimpl_{std::make_unique<port_model<event_ts...>>(std::move(wport))} {}
+  explicit any(port<event_ts...>&& wport)
+      : pimpl_{std::make_unique<model<event_ts...>>(std::move(wport))} {}
 
   template <typename event_t>
-  [[nodiscard]] bool send_event(const event_t& e) noexcept {
-    return pimpl_->send_event(e);
+  [[nodiscard]] bool send_event(const event_t& event) noexcept {
+    return pimpl_->send_event(event);
   }
 };
 }  // namespace multithreaded::write
