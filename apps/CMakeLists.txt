@@ -1,2 +1,2 @@
-add_subdirectory(demo)
+add_subdirectory(video-player)
 add_subdirectory(simple-app)

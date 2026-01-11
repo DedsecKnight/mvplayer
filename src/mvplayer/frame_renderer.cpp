@@ -1,19 +1,26 @@
 #include "frame_renderer.hpp"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
 #include <spdlog/spdlog.h>
 
 #include <format>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "events.hpp"
 #include "sdl_manager.hpp"
 
 namespace mvplayer {
-frame_renderer::frame_renderer(int32_t width, int32_t height, int32_t padding)
-    : width_{width}, height_{height}, padding_{padding} {
-  int32_t padded_width = width_ + 2 * padding_;
-  int32_t padded_height = height_ + 2 * padding_;
+
+frame_renderer::frame_renderer(int32_t padding) : padding_{padding} {}
+
+void frame_renderer::operator()(const new_video_loaded_event& event) {
+  width_ = event.payload().info.width;
+  height_ = event.payload().info.height;
+
+  int32_t padded_width = width_ + (2 * padding_);
+  int32_t padded_height = height_ + (2 * padding_);
 
   window_ =
       sdl_manager::create_window("video-player", padded_width, padded_height);
@@ -41,30 +48,39 @@ frame_renderer::frame_renderer(int32_t width, int32_t height, int32_t padding)
   spdlog::trace("SDL Texture created successfully");
 }
 
-bool frame_renderer::render_frame(const cv::Mat& frame) const noexcept {
+void frame_renderer::operator()(const new_frame_loaded_event& event) {
+  SDL_Event sdl_event;
+  while (SDL_PollEvent(&sdl_event)) {
+    if (sdl_event.type == SDL_EVENT_QUIT) {
+      std::ignore = request_termination();
+      return;
+    }
+  }
+
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
 
   cv::Mat padded_frame;
-  cv::copyMakeBorder(frame, padded_frame, padding_, padding_, padding_,
-                     padding_, cv::BORDER_CONSTANT);
+  cv::copyMakeBorder(event.payload().frame, padded_frame, padding_, padding_,
+                     padding_, padding_, cv::BORDER_CONSTANT);
 
-  void* pixels;
-  int32_t pitch;
+  void* pixels{nullptr};
+  int32_t pitch{};
   if (!SDL_LockTexture(texture_.get(), nullptr, &pixels, &pitch)) {
     spdlog::error("Error creating texture: {}", SDL_GetError());
-    return false;
+    std::ignore = event_handler_t::request_termination();
   }
-  std::memcpy(pixels, padded_frame.data, frame.elemSize() * frame.total());
+  std::memcpy(pixels, padded_frame.data,
+              event.payload().frame.elemSize() * event.payload().frame.total());
   SDL_UnlockTexture(texture_.get());
 
   if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr, nullptr) ||
       !SDL_RenderPresent(renderer_.get())) {
     spdlog::error("Error rendering frame: {}", SDL_GetError());
-    return false;
+    std::ignore = event_handler_t::request_termination();
   }
-  return true;
 }
 
 frame_renderer::~frame_renderer() { SDL_QuitSubSystem(SDL_INIT_VIDEO); }
+
 }  // namespace mvplayer

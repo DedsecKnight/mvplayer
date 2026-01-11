@@ -12,6 +12,7 @@ find_package(ffmpeg REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
+find_package(CLI11 REQUIRED)
 
 add_library(mvplayer)
 add_library(multithreaded)
@@ -59,8 +60,8 @@ target_sources(
       include/multithreaded/utils/queue.hpp
 )
 
-target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv SDL3::SDL3)
 target_link_libraries(multithreaded PUBLIC spdlog::spdlog)
+target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv SDL3::SDL3 multithreaded CLI11::CLI11)
 
 add_subdirectory(apps)
 add_subdirectory(tests)

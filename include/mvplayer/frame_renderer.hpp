@@ -5,20 +5,41 @@
 #include <cstdint>
 #include <opencv2/core.hpp>
 
+#include "events.hpp"
+#include "events/envelope.hpp"
+#include "events/handler.hpp"
 #include "utils/owned.hpp"
 
 namespace mvplayer {
-class frame_renderer {
+class frame_renderer
+    : public multithreaded::events::handlers<events::new_frame_loaded,
+                                             events::new_video_loaded> {
+ private:
+  using new_frame_loaded_event =
+      multithreaded::events::envelope<events::new_frame_loaded>;
+  using new_video_loaded_event =
+      multithreaded::events::envelope<events::new_video_loaded>;
+
  public:
-  [[nodiscard]] frame_renderer(int32_t width, int32_t height, int32_t padding);
+  frame_renderer(const frame_renderer&) = delete;
+  frame_renderer& operator=(const frame_renderer&) = delete;
+
+  frame_renderer(frame_renderer&&) = default;
+  frame_renderer& operator=(frame_renderer&&) = default;
+
+  void on_startup(std::span<char* const>) noexcept {}
+
+  [[nodiscard]] explicit frame_renderer(int32_t padding);
+  void operator()(const new_frame_loaded_event& event) override;
+  void operator()(const new_video_loaded_event& event) override;
   [[nodiscard]] bool render_frame(const cv::Mat& frame) const noexcept;
   void start() const noexcept;
   ~frame_renderer();
 
  private:
-  int32_t width_, height_, padding_;
   sdl_window window_{nullptr};
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
+  int32_t width_{}, height_{}, padding_{};
 };
 }  // namespace mvplayer
