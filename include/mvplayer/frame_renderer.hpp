@@ -38,9 +38,23 @@ class frame_renderer
   ~frame_renderer() noexcept override;
 
  private:
+  void event_listener() noexcept {
+    SDL_Event sdl_event;
+    while (!is_terminated_.load(std::memory_order_relaxed)) {
+      while (SDL_PollEvent(&sdl_event)) {
+        if (sdl_event.type == SDL_EVENT_QUIT) {
+          std::ignore = request_termination();
+          return;
+        }
+      }
+    }
+  }
+
+  std::thread event_listener_;
   sdl_window window_{nullptr};
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
   int32_t width_{}, height_{}, padding_{};
+  std::atomic<bool> is_terminated_{false};
 };
 }  // namespace mvplayer
