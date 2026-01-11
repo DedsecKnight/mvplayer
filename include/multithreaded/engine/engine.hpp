@@ -21,21 +21,24 @@ class engine {
   class processor_ref {
    public:
     using type = processor_t;
-    [[nodiscard]] processor_ref(const std::reference_wrapper<any_processor>& p,
-                                const std::reference_wrapper<engine>& e,
-                                std::string_view name)
-        : p_{p}, e_{e}, name_{name} {}
+    [[nodiscard]] processor_ref(
+        const std::reference_wrapper<any_processor>& processor_ref,
+        const std::reference_wrapper<engine>& engine_ref, std::string_view name)
+        : processor_ref_{processor_ref}, engine_ref_{engine_ref}, name_{name} {}
 
-    any_processor& get() const noexcept { return p_.get(); }
+    [[nodiscard]] any_processor& get() const noexcept {
+      return processor_ref_.get();
+    }
 
     [[nodiscard]] std::string_view name() const noexcept { return name_; }
 
     template <typename... event_ts>
     void subscribe_to(const auto& other) const noexcept {
-      auto [read_port, write_port] = e_.get().create_connector<event_ts...>();
+      auto [read_port, write_port] =
+          engine_ref_.get().create_connector<event_ts...>();
 
-      p_.get().as<processor_t>().add_read_port(other.name(),
-                                               std::move(read_port));
+      processor_ref_.get().as<processor_t>().add_read_port(
+          other.name(), std::move(read_port));
 
       using other_processor_t =
           typename std::remove_cvref_t<decltype(other)>::type;
@@ -44,12 +47,20 @@ class engine {
     }
 
    private:
-    std::reference_wrapper<any_processor> p_;
-    std::reference_wrapper<engine> e_;
+    std::reference_wrapper<any_processor> processor_ref_;
+    std::reference_wrapper<engine> engine_ref_;
     std::string_view name_;
   };
 
  public:
+  engine() = default;
+
+  engine(const engine&) = delete;
+  engine& operator=(const engine&) = delete;
+
+  engine(engine&&) = delete;
+  engine& operator=(engine&&) = delete;
+
   void start(std::span<char* const> args) noexcept;
 
   template <typename processor_t, typename... arg_ts>
@@ -89,12 +100,11 @@ class engine {
   void inject_system_event_writer(any_processor& processor) {
     auto [read_port, write_port] =
         create_connector<system_events::system_terminate_request_event>();
-    system_event_read_ports_.emplace_back(std::move(read_port));
+    system_event_read_ports_.emplace_back(read_port);
     processor.as<processor_t>().add_write_port(constants::ENGINE_IDENTIFIER,
                                                std::move(write_port));
   }
 
- private:
   std::vector<std::thread> processor_threads_;
   std::unordered_map<std::string, any_processor> processor_registry_;
   std::vector<connector> connectors_;
