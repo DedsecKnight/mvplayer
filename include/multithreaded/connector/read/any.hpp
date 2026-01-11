@@ -9,23 +9,23 @@
 namespace multithreaded::read {
 class any {
  private:
-  struct port_concept {
-    virtual ~port_concept() = default;
+  struct container {  // NOLINT
+    virtual ~container() = default;
 
     template <typename... processor_event_ts>
     [[nodiscard]] bool get_event(
-        std::variant<processor_event_ts...>& event) noexcept {
-      auto event_fetcher = [this, &event](auto&& e) -> bool {
-        using processor_event_t = std::decay_t<decltype(e)>;
+        std::variant<processor_event_ts...>& event_holder) noexcept {
+      auto event_fetcher = [this, &event_holder](auto&& event) -> bool {
+        using processor_event_t = std::decay_t<decltype(event)>;
         auto event_port_ptr =
             dynamic_cast<event_port<processor_event_t>*>(this);
         if (!event_port_ptr) {
           return false;
         }
-        if (!event_port_ptr->get_event(e)) {
+        if (!event_port_ptr->get_event(event)) {
           return false;
         }
-        event = e;
+        event_holder = event;
         return true;
       };
 
@@ -34,12 +34,11 @@ class any {
   };
 
   template <typename... event_ts>
-  class port_model
-      : public port_concept,
-        public event_port_impl<port_model<event_ts...>, event_ts>... {
+  class model : public container,
+                public event_port_impl<model<event_ts...>, event_ts>... {
    public:
     using queue_elem_t = typename port<event_ts...>::queue_elem_t;
-    port_model(port<event_ts...>&& rport) : read_port_{std::move(rport)} {}
+    explicit model(port<event_ts...>&& rport) : read_port_{std::move(rport)} {}
 
     template <typename event_t>
     [[nodiscard]] bool pop(event_t& elem) noexcept {
@@ -67,22 +66,22 @@ class any {
     port<event_ts...> read_port_;
   };
 
-  std::unique_ptr<port_concept> pimpl_;
+  std::unique_ptr<container> pimpl_;
 
  public:
   template <typename... event_ts>
-  any(port<event_ts...>&& rport)
-      : pimpl_{std::make_unique<port_model<event_ts...>>(std::move(rport))} {}
+  explicit any(port<event_ts...>&& rport)
+      : pimpl_{std::make_unique<model<event_ts...>>(std::move(rport))} {}
 
   template <typename... processor_event_ts>
   [[nodiscard]] bool get_event(
-      std::variant<processor_event_ts...>& e) noexcept {
-    return pimpl_->get_event(e);
+      std::variant<processor_event_ts...>& event_holder) noexcept {
+    return pimpl_->get_event(event_holder);
   }
 
   template <typename... event_ts>
-  [[nodiscard]] port_model<event_ts...>& as_port_of() const {
-    auto* model_ptr = dynamic_cast<port_model<event_ts...>*>(pimpl_.get());
+  [[nodiscard]] model<event_ts...>& as_port_of() const {
+    auto* model_ptr = dynamic_cast<model<event_ts...>*>(pimpl_.get());
     if (!model_ptr) {
       throw std::bad_cast{};
     }
