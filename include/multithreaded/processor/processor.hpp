@@ -15,15 +15,15 @@ class any_processor {
  private:
   using name_t = std::string_view;
 
-  struct processor_concept {
-    virtual ~processor_concept() = default;
+  struct container {  // NOLINT
+    virtual ~container() = default;
     virtual void start_event_loop(std::span<char* const> args) noexcept = 0;
     [[nodiscard]] virtual bool terminated() const noexcept = 0;
     virtual void terminate() noexcept = 0;
   };
 
   template <typename processor_t>
-  class processor_model : public processor_concept {
+  class model : public container {
    private:
     using event_handler_t = typename processor_t::event_handler_t;
 
@@ -38,7 +38,7 @@ class any_processor {
 
     template <typename... arg_ts>
       requires std::constructible_from<processor_t, arg_ts...>
-    processor_model(arg_ts&&... args)
+    explicit model(arg_ts&&... args)
         : processor_(std::forward<arg_ts>(args)...) {}
 
     template <typename... event_ts>
@@ -64,7 +64,7 @@ class any_processor {
         auto& output_queues = processor_.output_queues().get();
         for (auto&& [sender_name, rp] : processor_.input_queues().get()) {
           write::any* sender_mailbox{nullptr};
-          auto it = output_queues.find(sender_name);
+          auto it = output_queues.find(sender_name);  // NOLINT
           if (it != output_queues.end()) {
             sender_mailbox = &it->second;
           }
@@ -84,14 +84,14 @@ class any_processor {
 
  public:
   template <typename processor_t>
-  any_processor(processor_t&& processor)
-      : pimpl_{std::make_unique<processor_model<processor_t>>(
-            std::move(processor))} {}
+    requires(!std::is_same_v<any_processor, std::decay_t<processor_t>>)
+  explicit any_processor(processor_t&& processor)
+      : pimpl_{std::make_unique<model<processor_t>>(
+            std::forward<processor_t>(processor))} {}
 
   template <typename processor_t>
-  processor_model<processor_t>& as() {
-    auto processor_ptr =
-        dynamic_cast<processor_model<processor_t>*>(pimpl_.get());
+  model<processor_t>& as() {
+    auto processor_ptr = dynamic_cast<model<processor_t>*>(pimpl_.get());
     if (!processor_ptr) {
       // TODO: Consider a better way to handle error instead of throwing
       throw std::bad_cast{};
@@ -109,6 +109,6 @@ class any_processor {
   }
 
  private:
-  std::unique_ptr<processor_concept> pimpl_;
+  std::unique_ptr<container> pimpl_;
 };
 }  // namespace multithreaded
