@@ -37,13 +37,13 @@ class envelope {
   [[nodiscard]] const sender_info& sender() const noexcept { return sender_; }
 
   template <typename event_t>
-  void reply([[maybe_unused]] const event_t& e) const noexcept {
+  void reply(const event_t& event) const noexcept {
     if (sender_.mailbox_ == nullptr) {
       // TODO: figure out what to do here
       std::println("No mailbox found");
       return;
     }
-    if (!sender_.mailbox_->send_event(e)) {
+    if (!sender_.mailbox_->send_event(event)) {
       std::println("Failed to send event {}", typeid(payload_t).name());
       // TODO: figure out what to do here. retries maybe?
     }
@@ -59,9 +59,7 @@ class envelope_generator {
  public:
   [[nodiscard]] envelope_generator(std::string_view sender_name,
                                    write::any* return_mailbox)
-      : sender_name_{sender_name},
-        return_mailbox_{return_mailbox},
-        enveloped_event_{} {}
+      : sender_name_{sender_name}, return_mailbox_{return_mailbox} {}
 
   template <typename payload_t>
   void operator()(const payload_t& payload) {
@@ -79,7 +77,7 @@ class envelope_generator {
  private:
   std::string_view sender_name_;
   write::any* return_mailbox_;
-  std::variant<envelope<event_ts>...> enveloped_event_;
+  std::variant<envelope<event_ts>...> enveloped_event_{};
 };
 
 };  // namespace multithreaded::events

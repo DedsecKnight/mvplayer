@@ -30,9 +30,9 @@ class any_handler {
   }
 
   template <typename event_t>
-  void broadcast(const event_t& e) noexcept {
-    for (auto&& [recipient_name, wp] : output_queue_) {
-      if (wp.send_event(e)) {
+  void broadcast(const event_t& event) noexcept {
+    for (auto&& [recipient_name, write_port] : output_queue_) {
+      if (write_port.send_event(event)) {
         spdlog::trace("Sucessfully sent event to {}", recipient_name);
       }
     }
