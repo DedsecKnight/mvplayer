@@ -9,9 +9,9 @@
 #include "connector/write/any.hpp"
 #include "connector/write/port.hpp"
 
-namespace multithreaded {
+namespace multithreaded::processor {
 
-class any_processor {
+class any {
  private:
   using name_t = std::string_view;
 
@@ -84,8 +84,8 @@ class any_processor {
 
  public:
   template <typename processor_t>
-    requires(!std::is_same_v<any_processor, std::decay_t<processor_t>>)
-  explicit any_processor(processor_t&& processor)
+    requires(!std::is_same_v<any, std::decay_t<processor_t>>)
+  explicit any(processor_t&& processor)
       : pimpl_{std::make_unique<model<processor_t>>(
             std::forward<processor_t>(processor))} {}
 
@@ -111,4 +111,4 @@ class any_processor {
  private:
   std::unique_ptr<container> pimpl_;
 };
-}  // namespace multithreaded
+}  // namespace multithreaded::processor

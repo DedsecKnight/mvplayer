@@ -10,7 +10,7 @@
 
 #include "connector/connector.hpp"
 #include "engine/utils.hpp"
-#include "processor/processor.hpp"
+#include "processor/any.hpp"
 #include "utils/traits.hpp"
 
 namespace multithreaded {
@@ -22,11 +22,11 @@ class engine {
    public:
     using type = processor_t;
     [[nodiscard]] processor_ref(
-        const std::reference_wrapper<any_processor>& processor_ref,
+        const std::reference_wrapper<processor::any>& processor_ref,
         const std::reference_wrapper<engine>& engine_ref, std::string_view name)
         : processor_ref_{processor_ref}, engine_ref_{engine_ref}, name_{name} {}
 
-    [[nodiscard]] any_processor& get() const noexcept {
+    [[nodiscard]] processor::any& get() const noexcept {
       return processor_ref_.get();
     }
 
@@ -47,7 +47,7 @@ class engine {
     }
 
    private:
-    std::reference_wrapper<any_processor> processor_ref_;
+    std::reference_wrapper<processor::any> processor_ref_;
     std::reference_wrapper<engine> engine_ref_;
     std::string_view name_;
   };
@@ -97,7 +97,7 @@ class engine {
   }
 
   template <typename processor_t>
-  void inject_system_event_writer(any_processor& processor) {
+  void inject_system_event_writer(processor::any& processor) {
     auto [read_port, write_port] =
         create_connector<system_events::system_terminate_request_event>();
     system_event_read_ports_.emplace_back(read_port);
@@ -106,7 +106,7 @@ class engine {
   }
 
   std::vector<std::thread> processor_threads_;
-  std::unordered_map<std::string, any_processor> processor_registry_;
+  std::unordered_map<std::string, processor::any> processor_registry_;
   std::vector<connector> connectors_;
   std::vector<read::port<system_events::system_terminate_request_event>>
       system_event_read_ports_;
