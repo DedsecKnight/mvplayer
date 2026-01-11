@@ -8,6 +8,7 @@
 #include "connector/read/port.hpp"
 #include "connector/write/any.hpp"
 #include "connector/write/port.hpp"
+#include "processor/termination_handler.hpp"
 
 namespace multithreaded::processor {
 
@@ -29,6 +30,11 @@ class any {
 
    public:
     void terminate() noexcept override {
+      auto* terminate_handler_ptr =
+          dynamic_cast<processor::termination_handler*>(&processor_);
+      if (terminate_handler_ptr != nullptr) {
+        terminate_handler_ptr->handle_termination_signal();
+      }
       terminated_.store(true, std::memory_order_relaxed);
     }
 

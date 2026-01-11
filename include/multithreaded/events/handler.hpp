@@ -51,7 +51,6 @@ class any_handler {
 template <typename event_t>
 class handler {
  public:
-  handler() = default;
   virtual void operator()(const envelope<event_t>& val) = 0;
 };
 
