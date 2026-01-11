@@ -12,6 +12,14 @@ namespace multithreaded::events {
 
 class any_handler {
  public:
+  any_handler() = default;
+
+  any_handler(const any_handler&) = delete;
+  any_handler& operator=(const any_handler&) = delete;
+
+  any_handler(any_handler&&) = default;
+  any_handler& operator=(any_handler&&) = default;
+
   template <typename... event_ts>
   void add_read_port(std::string_view sender_name,
                      read::port<event_ts...>&& read_port) {
@@ -43,6 +51,8 @@ class any_handler {
         .send_event(system_events::system_terminate_request_event{});
   }
 
+  virtual ~any_handler() = default;
+
  private:
   std::unordered_map<std::string_view, read::any> input_queue_;
   std::unordered_map<std::string_view, write::any> output_queue_;
@@ -51,12 +61,31 @@ class any_handler {
 template <typename event_t>
 class handler {
  public:
+  handler() = default;
+
+  handler(const handler&) = delete;
+  handler& operator=(const handler&) = delete;
+
+  handler(handler&&) = default;
+  handler& operator=(handler&&) = default;
+
+  virtual ~handler() = default;
   virtual void operator()(const envelope<event_t>& val) = 0;
 };
 
 template <typename... event_ts>
 class handlers : public any_handler, public handler<event_ts>... {
  public:
+  ~handlers() override = default;
+
+  handlers() = default;
+
+  handlers(const handlers&) = delete;
+  handlers& operator=(const handlers&) = delete;
+
+  handlers(handlers&&) = default;
+  handlers& operator=(handlers&&) = default;
+
   using event_handler_t = handlers<event_ts...>;
   using event_receiver_t = std::variant<event_ts...>;
   using enveloped_event_generator_t = envelope_generator<event_ts...>;

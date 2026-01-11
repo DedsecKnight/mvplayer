@@ -10,10 +10,29 @@
 
 #include "events.hpp"
 #include "sdl_manager.hpp"
+#include "utils/owned.hpp"
 
 namespace mvplayer {
 
 frame_renderer::frame_renderer(int32_t padding) : padding_{padding} {}
+
+frame_renderer::frame_renderer(frame_renderer&& renderer) noexcept
+    : window_{renderer.window_.release()},
+      renderer_{renderer.renderer_.release()},
+      texture_{renderer.texture_.release()},
+      width_{renderer.width_},
+      height_{renderer.height_},
+      padding_{renderer.padding_} {}
+
+frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
+  window_ = sdl_window{renderer.window_.release()};
+  renderer_ = sdl_renderer{renderer.renderer_.release()};
+  texture_ = sdl_texture{renderer.texture_.release()};
+  width_ = renderer.width_;
+  height_ = renderer.height_;
+  padding_ = renderer.padding_;
+  return *this;
+}
 
 void frame_renderer::operator()(const new_video_loaded_event& event) {
   width_ = event.payload().info.width;
@@ -81,6 +100,8 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
   }
 }
 
-frame_renderer::~frame_renderer() { SDL_QuitSubSystem(SDL_INIT_VIDEO); }
+frame_renderer::~frame_renderer() noexcept {
+  SDL_QuitSubSystem(SDL_INIT_VIDEO);
+}
 
 }  // namespace mvplayer

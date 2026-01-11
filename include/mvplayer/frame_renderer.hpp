@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <atomic>
 #include <cstdint>
 #include <opencv2/core.hpp>
 
@@ -24,8 +25,8 @@ class frame_renderer
   frame_renderer(const frame_renderer&) = delete;
   frame_renderer& operator=(const frame_renderer&) = delete;
 
-  frame_renderer(frame_renderer&&) = default;
-  frame_renderer& operator=(frame_renderer&&) = default;
+  frame_renderer(frame_renderer&&) noexcept;
+  frame_renderer& operator=(frame_renderer&&) noexcept;
 
   void on_startup(std::span<char* const>) noexcept {}
 
@@ -34,7 +35,7 @@ class frame_renderer
   void operator()(const new_video_loaded_event& event) override;
   [[nodiscard]] bool render_frame(const cv::Mat& frame) const noexcept;
   void start() const noexcept;
-  ~frame_renderer();
+  ~frame_renderer() noexcept override;
 
  private:
   sdl_window window_{nullptr};

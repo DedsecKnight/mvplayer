@@ -26,7 +26,7 @@ class video_reader
       multithreaded::events::envelope<events::video_played>;
 
  public:
-  ~video_reader() noexcept;
+  ~video_reader() noexcept override;
 
   video_reader() = default;
 
