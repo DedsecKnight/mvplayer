@@ -31,9 +31,12 @@ class spsc_queue {
       return false;
     }
 
+    // NOLINTBEGIN
     std::construct_at(
-        reinterpret_cast<T*>(data_ + sizeof(T) * (current_write_index & Size)),
+        std::launder(reinterpret_cast<T*>(
+            data_.data() + (sizeof(T) * (current_write_index & Size)))),
         std::forward<ArgTs>(args)...);
+    // NOLINTEND
 
     write_index_.store(current_write_index + 1, std::memory_order_release);
     return true;
@@ -46,8 +49,11 @@ class spsc_queue {
       return false;
     }
 
-    T* queue_element =
-        reinterpret_cast<T*>(data_ + sizeof(T) * (current_read_index & Size));
+    // NOLINTBEGIN
+    T* queue_element = std::launder(reinterpret_cast<T*>(
+        data_.data() + (sizeof(T) * (current_read_index & Size))));
+    // NOLINTEND
+
     std::construct_at(&elem, *queue_element);
     queue_element->~T();
 
@@ -58,7 +64,7 @@ class spsc_queue {
  private:
   alignas(CACHE_LINE_SIZE) std::atomic<size_t> read_index_{0};
   alignas(CACHE_LINE_SIZE) std::atomic<size_t> write_index_{0};
-  alignas(CACHE_LINE_SIZE) std::byte data_[sizeof(T) * (Size + 1)];
+  alignas(CACHE_LINE_SIZE) std::array<std::byte, sizeof(T) * (Size + 1)> data_;
 };
 
 }  // namespace multithreaded::utils
