@@ -3,7 +3,7 @@
 #include <atomic>
 #include <variant>
 
-#include "processor/processor.hpp"
+#include "processor/any.hpp"
 
 namespace multithreaded {
 
@@ -23,7 +23,7 @@ engine::~engine() noexcept {
 void engine::start(std::span<char* const> args) noexcept {
   for (const auto& [processor_name, processor] : processor_registry_) {
     spdlog::info("Starting {}", processor_name);
-    processor_threads_.emplace_back(&any_processor::start, &processor, args);
+    processor_threads_.emplace_back(&processor::any::start, &processor, args);
   }
   while (!is_terminated_.load(std::memory_order_relaxed)) {
     for (auto& system_event_port : system_event_read_ports_) {
