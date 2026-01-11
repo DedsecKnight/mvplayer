@@ -53,7 +53,7 @@ class connector {
   ~connector() = default;
 
   template <typename... event_ts>
-  model<event_ts...>& as_connector_of() const {
+  [[nodiscard]] model<event_ts...>& as_connector_of() const {
     auto* model_ptr = dynamic_cast<model<event_ts...>*>(pimpl_.get());
     if (model_ptr == nullptr) {
       // TODO: Consider a better way to handle error instead of throwing

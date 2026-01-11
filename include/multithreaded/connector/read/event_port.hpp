@@ -5,7 +5,7 @@ template <typename event_t>
 class event_port {  // NOLINT
  public:
   virtual ~event_port() = default;
-  virtual bool get_event(event_t& elem) noexcept = 0;
+  [[nodiscard]] virtual bool get_event(event_t& elem) noexcept = 0;
 };
 
 // TODO: figure out whether we should define move semantics and copy semantics

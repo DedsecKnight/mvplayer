@@ -5,12 +5,12 @@ template <typename event_t>
 class event_port {  // NOLINT
  public:
   virtual ~event_port() = default;
-  virtual bool send_event(const event_t& event) noexcept = 0;
+  [[nodiscard]] virtual bool send_event(const event_t& event) noexcept = 0;
 };
 
 template <typename port_t, typename event_t>
 class event_port_impl : public event_port<event_t> {
-  bool send_event(const event_t& event) noexcept override {
+  [[nodiscard]] bool send_event(const event_t& event) noexcept override {
     return static_cast<port_t*>(this)->push(event);
   }
 };

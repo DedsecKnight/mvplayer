@@ -90,7 +90,7 @@ class any {
             std::forward<processor_t>(processor))} {}
 
   template <typename processor_t>
-  model<processor_t>& as() {
+  [[nodiscard]] model<processor_t>& as() {
     auto processor_ptr = dynamic_cast<model<processor_t>*>(pimpl_.get());
     if (!processor_ptr) {
       // TODO: Consider a better way to handle error instead of throwing
