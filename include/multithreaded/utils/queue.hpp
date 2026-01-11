@@ -25,8 +25,8 @@ class spsc_queue {
     requires std::constructible_from<T, ArgTs...>
   [[nodiscard]] bool emplace(ArgTs&&... args) noexcept {
     auto current_write_index = write_index_.load(std::memory_order_relaxed);
-    if (current_write_index - read_index_.load(std::memory_order_acquire) >=
-        Size) {
+    auto next_write_index = (current_write_index + 1) & Size;
+    if (next_write_index == read_index_.load(std::memory_order_acquire)) {
       spdlog::trace("Queue is full");
       return false;
     }
@@ -38,7 +38,7 @@ class spsc_queue {
         std::forward<ArgTs>(args)...);
     // NOLINTEND
 
-    write_index_.store(current_write_index + 1, std::memory_order_release);
+    write_index_.store(next_write_index, std::memory_order_release);
     return true;
   }
 
@@ -57,7 +57,8 @@ class spsc_queue {
     std::construct_at(&elem, *queue_element);
     queue_element->~T();
 
-    read_index_.store(current_read_index + 1, std::memory_order_release);
+    read_index_.store((current_read_index + 1) & Size,
+                      std::memory_order_release);
     return true;
   }
 
