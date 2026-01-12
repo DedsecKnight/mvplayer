@@ -13,6 +13,9 @@
 #include "utils/owned.hpp"
 
 namespace mvplayer {
+
+static constexpr size_t CACHE_LINE_SIZE = 64;
+
 class frame_renderer
     : public multithreaded::events::handlers<events::new_frame_loaded,
                                              events::new_video_loaded>,
@@ -24,8 +27,10 @@ class frame_renderer
       multithreaded::events::envelope<events::new_video_loaded>;
 
   struct video_playback_state {
+    alignas(CACHE_LINE_SIZE) std::atomic<uint64_t> extra_time;
+    std::array<uint8_t, CACHE_LINE_SIZE - sizeof(extra_time)> padding;
+
     AVRational timebase;
-    std::atomic<uint64_t> extra_time;
     uint64_t first_frame_render_ts;
     int64_t expected_frame_no{1};
     bool first_frame_rendered;
