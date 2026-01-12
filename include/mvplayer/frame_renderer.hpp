@@ -9,12 +9,14 @@
 #include "events.hpp"
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
+#include "processor/termination_handler.hpp"
 #include "utils/owned.hpp"
 
 namespace mvplayer {
 class frame_renderer
     : public multithreaded::events::handlers<events::new_frame_loaded,
-                                             events::new_video_loaded> {
+                                             events::new_video_loaded>,
+      public multithreaded::processor::termination_handler {
  private:
   using new_frame_loaded_event =
       multithreaded::events::envelope<events::new_frame_loaded>;
@@ -29,6 +31,9 @@ class frame_renderer
   frame_renderer& operator=(frame_renderer&&) noexcept;
 
   void on_startup([[maybe_unused]] std::span<char* const> args) noexcept {}
+  void handle_termination_signal() noexcept override {
+    is_terminated_.store(true, std::memory_order_relaxed);
+  }
 
   [[nodiscard]] explicit frame_renderer(int32_t padding);
   void operator()(const new_frame_loaded_event& event) override;
