@@ -4,12 +4,15 @@
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_scancode.h>
+#include <SDL3/SDL_timer.h>
 #include <spdlog/spdlog.h>
 
 #include <atomic>
+#include <chrono>
 #include <format>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <thread>
 
 #include "events.hpp"
 #include "sdl_manager.hpp"
@@ -44,6 +47,10 @@ frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
 void frame_renderer::operator()(const new_video_loaded_event& event) {
   width_ = event.payload().info.width;
   height_ = event.payload().info.height;
+
+  playback_state_.first_frame_rendered = false;
+  playback_state_.first_frame_render_ts = 0;
+  playback_state_.timebase = event.payload().info.tbn;
 
   int32_t padded_width = width_ + (2 * padding_);
   int32_t padded_height = height_ + (2 * padding_);
@@ -93,6 +100,33 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
               event.payload().frame.elemSize() * event.payload().frame.total());
   SDL_UnlockTexture(texture_.get());
 
+  auto curr_frame_ts = SDL_GetTicks();
+  spdlog::trace("Current frame timestamp: {}. PTS = {}. Timebase = {} / {}",
+                curr_frame_ts, event.payload().frame_pts,
+                playback_state_.timebase.num, playback_state_.timebase.den);
+
+  if (!playback_state_.first_frame_rendered) {
+    playback_state_.first_frame_render_ts = curr_frame_ts;
+    playback_state_.first_frame_rendered = true;
+  } else {
+    auto pts_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::seconds(event.payload().frame_pts))
+                         .count();
+    auto expected_render_time =
+        playback_state_.first_frame_render_ts +
+        playback_state_.extra_time.load(std::memory_order_relaxed) +
+        static_cast<uint64_t>(std::ceil(
+            static_cast<double>(pts_in_ms * playback_state_.timebase.num) /
+            playback_state_.timebase.den));
+    auto wait_time = expected_render_time - curr_frame_ts;
+    if (wait_time < 0) {
+      spdlog::critical("Frame renderer is {}ms behind", -wait_time);
+    } else {
+      SDL_Delay(wait_time);
+      spdlog::trace("Slept for {}ms", wait_time);
+    }
+  }
+
   if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr, nullptr) ||
       !SDL_RenderPresent(renderer_.get())) {
     spdlog::error("Error rendering frame: {}", SDL_GetError());
@@ -109,6 +143,8 @@ frame_renderer::~frame_renderer() noexcept {
 
 void frame_renderer::event_listener() noexcept {
   SDL_Event sdl_event;
+  int64_t stop_counter = 0;
+  bool is_paused = false;
   while (!is_terminated_.load(std::memory_order_relaxed)) {
     while (SDL_PollEvent(&sdl_event)) {
       if (sdl_event.type == SDL_EVENT_QUIT) {
@@ -117,6 +153,19 @@ void frame_renderer::event_listener() noexcept {
       }
       if (sdl_event.type == SDL_EVENT_KEY_DOWN) {
         if (sdl_event.key.scancode == SDL_SCANCODE_SPACE) {
+          const auto current_ts =
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::high_resolution_clock::now().time_since_epoch())
+                  .count();
+          if (!is_paused) {
+            stop_counter -= current_ts;
+          } else {
+            stop_counter += current_ts;
+            playback_state_.extra_time.fetch_add(stop_counter,
+                                                 std::memory_order_relaxed);
+            stop_counter = 0;
+          }
+          is_paused = !is_paused;
           broadcast(events::playback_toggled{});
         }
       }

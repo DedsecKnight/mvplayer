@@ -11,7 +11,7 @@ extern "C" {
 namespace mvplayer {
 struct video_info {
   std::string_view codec_name, format;
-  AVRational fps;
+  AVRational fps, tbn;
   int64_t bit_rate, duration;
   int32_t width, height;
 };

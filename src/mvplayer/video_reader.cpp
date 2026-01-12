@@ -99,6 +99,7 @@ std::optional<video_info> video_reader::load_video(
                                    format_context_ptr_->iformat->long_name,
                                    codec_ptr->long_name,
                                    (*video_stream_it)->avg_frame_rate,
+                                   (*video_stream_it)->time_base,
                                    codec_params_ptr->bit_rate,
                                    format_context_ptr_->duration,
                                    codec_params_ptr->width,
@@ -144,6 +145,9 @@ void video_reader::decode_video() noexcept {
     cv::Mat frame_mat(converted_frame->height, converted_frame->width, CV_8UC3);
     std::memcpy(frame_mat.data, converted_frame->data[0],
                 frame_mat.elemSize() * frame_mat.total());
+    if (is_terminated_.load(std::memory_order_acquire)) {
+      break;
+    }
     event_handler_t::broadcast(
         events::new_frame_loaded{.frame = frame_mat,
                                  .frame_num = codec_context_ptr_->frame_num,

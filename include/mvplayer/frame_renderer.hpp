@@ -23,6 +23,13 @@ class frame_renderer
   using new_video_loaded_event =
       multithreaded::events::envelope<events::new_video_loaded>;
 
+  struct video_playback_state {
+    AVRational timebase;
+    std::atomic<uint64_t> extra_time;
+    uint64_t first_frame_render_ts;
+    bool first_frame_rendered;
+  };
+
  public:
   frame_renderer(const frame_renderer&) = delete;
   frame_renderer& operator=(const frame_renderer&) = delete;
@@ -49,6 +56,7 @@ class frame_renderer
   sdl_window window_{nullptr};
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
+  video_playback_state playback_state_{};
   int32_t width_{}, height_{}, padding_{};
   std::atomic<bool> is_terminated_{false};
 };
