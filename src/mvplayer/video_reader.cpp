@@ -145,7 +145,7 @@ void video_reader::decode_video() noexcept {
     cv::Mat frame_mat(converted_frame->height, converted_frame->width, CV_8UC3);
     std::memcpy(frame_mat.data, converted_frame->data[0],
                 frame_mat.elemSize() * frame_mat.total());
-    if (is_terminated_.load(std::memory_order_acquire)) {
+    if (is_terminated_.load(std::memory_order_relaxed)) {
       break;
     }
     event_handler_t::broadcast(
