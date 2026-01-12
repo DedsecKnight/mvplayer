@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <bit>
+#include <chrono>
 #include <cstddef>
 #include <memory>
 
@@ -26,9 +27,26 @@ class spsc_queue {
   [[nodiscard]] bool emplace(ArgTs&&... args) noexcept {
     auto current_write_index = write_index_.load(std::memory_order_relaxed);
     auto next_write_index = (current_write_index + 1) & Size;
-    if (next_write_index == read_index_.load(std::memory_order_acquire)) {
-      spdlog::trace("Queue is full");
-      return false;
+    int64_t wait_time_ms = 1;
+    while (next_write_index == read_index_.load(std::memory_order_acquire)) {
+      if (wait_time_ms >= 512) {
+        return false;
+      }
+      auto target_time_ms =
+          wait_time_ms +
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::high_resolution_clock::now().time_since_epoch())
+              .count();
+      while (true) {
+        auto current_time_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::high_resolution_clock::now().time_since_epoch())
+                .count();
+        if (current_time_ms >= target_time_ms) {
+          break;
+        }
+      }
+      wait_time_ms *= 2;
     }
 
     // NOLINTBEGIN
