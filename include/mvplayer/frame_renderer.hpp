@@ -28,7 +28,7 @@ class frame_renderer
   frame_renderer(frame_renderer&&) noexcept;
   frame_renderer& operator=(frame_renderer&&) noexcept;
 
-  void on_startup(std::span<char* const>) noexcept {}
+  void on_startup([[maybe_unused]] std::span<char* const> args) noexcept {}
 
   [[nodiscard]] explicit frame_renderer(int32_t padding);
   void operator()(const new_frame_loaded_event& event) override;
@@ -38,17 +38,7 @@ class frame_renderer
   ~frame_renderer() noexcept override;
 
  private:
-  void event_listener() noexcept {
-    SDL_Event sdl_event;
-    while (!is_terminated_.load(std::memory_order_relaxed)) {
-      while (SDL_PollEvent(&sdl_event)) {
-        if (sdl_event.type == SDL_EVENT_QUIT) {
-          std::ignore = request_termination();
-          return;
-        }
-      }
-    }
-  }
+  void event_listener() noexcept;
 
   std::thread event_listener_;
   sdl_window window_{nullptr};

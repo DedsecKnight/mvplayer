@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_events.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_scancode.h>
 #include <spdlog/spdlog.h>
 
 #include <atomic>
@@ -103,6 +105,18 @@ frame_renderer::~frame_renderer() noexcept {
     event_listener_.join();
   }
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
+}
+
+void frame_renderer::event_listener() noexcept {
+  SDL_Event sdl_event;
+  while (!is_terminated_.load(std::memory_order_relaxed)) {
+    while (SDL_PollEvent(&sdl_event)) {
+      if (sdl_event.type == SDL_EVENT_QUIT) {
+        std::ignore = request_termination();
+        return;
+      }
+    }
+  }
 }
 
 }  // namespace mvplayer
