@@ -87,8 +87,6 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         "Expected frame no {}, {} found. Lost {} frames",
         playback_state_.expected_frame_no, event.payload().frame_num,
         event.payload().frame_num - playback_state_.expected_frame_no);
-  } else {
-    playback_state_.expected_frame_no++;
   }
 
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
@@ -141,6 +139,8 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     spdlog::error("Error rendering frame: {}", SDL_GetError());
     std::ignore = event_handler_t::request_termination();
   }
+
+  playback_state_.expected_frame_no++;
 }
 
 frame_renderer::~frame_renderer() noexcept {
