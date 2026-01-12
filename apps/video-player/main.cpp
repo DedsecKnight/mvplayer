@@ -15,8 +15,7 @@ int main(int argc, char** argv) {
 
   frame_renderer.subscribe_to<mvplayer::events::new_frame_loaded,
                               mvplayer::events::new_video_loaded>(video_reader);
-  video_reader.subscribe_to<mvplayer::events::video_paused,
-                            mvplayer::events::video_played>(frame_renderer);
+  video_reader.subscribe_to<mvplayer::events::playback_toggled>(frame_renderer);
 
   engine.start(std::span(argv, argc));
 }

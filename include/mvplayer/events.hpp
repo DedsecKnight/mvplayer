@@ -8,9 +8,7 @@ extern "C" {
 #include <libavutil/rational.h>
 }
 namespace mvplayer::events {
-struct video_played {};
-
-struct video_paused {};
+struct playback_toggled {};
 
 struct new_frame_loaded {
   cv::Mat frame;

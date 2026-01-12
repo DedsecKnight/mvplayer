@@ -115,6 +115,11 @@ void frame_renderer::event_listener() noexcept {
         std::ignore = request_termination();
         return;
       }
+      if (sdl_event.type == SDL_EVENT_KEY_DOWN) {
+        if (sdl_event.key.scancode == SDL_SCANCODE_SPACE) {
+          broadcast(events::playback_toggled{});
+        }
+      }
     }
   }
 }
