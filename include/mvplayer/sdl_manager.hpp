@@ -19,8 +19,8 @@ class sdl_manager {
   sdl_manager& operator=(sdl_manager&&) = delete;
 
   [[nodiscard]] static sdl_window create_window(std::string_view window_name,
-                                                int width,
-                                                int height) noexcept {
+                                                int32_t width,
+                                                int32_t height) noexcept {
     return get_instance().new_window(window_name, width, height);
   }
 
@@ -39,8 +39,8 @@ class sdl_manager {
 
  private:
   // NOLINTNEXTLINE
-  [[nodiscard]] sdl_window new_window(std::string_view window_name, int width,
-                                      int height) {
+  [[nodiscard]] sdl_window new_window(std::string_view window_name,
+                                      int32_t width, int32_t height) {
     std::string safe_window_name{window_name};
     return sdl_window{
         SDL_CreateWindow(safe_window_name.c_str(), width, height,
