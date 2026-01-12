@@ -33,7 +33,6 @@ class frame_renderer
     AVRational timebase;
     uint64_t first_frame_render_ts;
     int64_t expected_frame_no{1};
-    bool first_frame_rendered;
   };
 
  public:

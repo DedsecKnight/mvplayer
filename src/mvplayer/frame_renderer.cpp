@@ -48,7 +48,6 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   width_ = event.payload().info.width;
   height_ = event.payload().info.height;
 
-  playback_state_.first_frame_rendered = false;
   playback_state_.first_frame_render_ts = 0;
   playback_state_.timebase = event.payload().info.tbn;
 
@@ -114,9 +113,10 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
                 curr_frame_ts, event.payload().frame_pts,
                 playback_state_.timebase.num, playback_state_.timebase.den);
 
-  if (!playback_state_.first_frame_rendered) {
+  if (playback_state_.expected_frame_no == 1) {
+    // If no frames are rendered yet, use curr_frame_ts as base timestamp for
+    // future renders
     playback_state_.first_frame_render_ts = curr_frame_ts;
-    playback_state_.first_frame_rendered = true;
   } else {
     auto pts_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::seconds(event.payload().frame_pts))
