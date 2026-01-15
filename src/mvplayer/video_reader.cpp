@@ -136,23 +136,34 @@ void video_reader::decode_video() noexcept {
         av_read_frame(format_context_ptr_, packet.get()) < 0) {
       continue;
     }
-    avcodec_send_packet(codec_context_ptr_, packet.get());
-    avcodec_receive_frame(codec_context_ptr_, frame.get());
+    auto ret = avcodec_send_packet(codec_context_ptr_, packet.get());
+    while (ret >= 0) {
+      if (is_terminated_.load(std::memory_order_relaxed)) {
+        return;
+      }
+      if (is_paused_.load(std::memory_order_relaxed)) {
+        continue;
+      }
+      ret = avcodec_receive_frame(codec_context_ptr_, frame.get());
+      if (ret == AVERROR(EAGAIN)) {
+        break;
+      }
+      auto converted_frame =
+          utils::convert_frame(frame.get(), AVPixelFormat::AV_PIX_FMT_RGB24);
 
-    auto converted_frame =
-        utils::convert_frame(frame.get(), AVPixelFormat::AV_PIX_FMT_RGB24);
-
-    cv::Mat frame_mat(converted_frame->height, converted_frame->width, CV_8UC3);
-    std::memcpy(frame_mat.data, converted_frame->data[0],
-                frame_mat.elemSize() * frame_mat.total());
-    if (is_terminated_.load(std::memory_order_relaxed)) {
-      break;
+      cv::Mat frame_mat(converted_frame->height, converted_frame->width,
+                        CV_8UC3);
+      std::memcpy(frame_mat.data, converted_frame->data[0],
+                  frame_mat.elemSize() * frame_mat.total());
+      if (is_terminated_.load(std::memory_order_relaxed)) {
+        break;
+      }
+      event_handler_t::broadcast(
+          events::new_frame_loaded{.frame = frame_mat,
+                                   .frame_num = codec_context_ptr_->frame_num,
+                                   .frame_pts = frame->pts,
+                                   .frame_pkt_dts = frame->pkt_dts});
     }
-    event_handler_t::broadcast(
-        events::new_frame_loaded{.frame = frame_mat,
-                                 .frame_num = codec_context_ptr_->frame_num,
-                                 .frame_pts = frame->pts,
-                                 .frame_pkt_dts = frame->pkt_dts});
   }
 }
 
