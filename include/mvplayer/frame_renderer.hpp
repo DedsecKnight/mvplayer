@@ -44,7 +44,7 @@ class frame_renderer
 
   void on_startup([[maybe_unused]] std::span<char* const> args) noexcept {}
   void handle_termination_signal() noexcept override {
-    is_terminated_.store(true, std::memory_order_relaxed);
+    is_terminated_.store(true, std::memory_order_release);
   }
 
   [[nodiscard]] explicit frame_renderer(int32_t padding);

@@ -48,7 +48,7 @@ void video_reader::on_startup(std::span<char* const> args) noexcept {
 
 video_reader::video_reader(video_reader&& reader) noexcept
     : frame_decoder_{std::move(reader.frame_decoder_)},
-      is_paused_{reader.is_paused_.load(std::memory_order_relaxed)} {
+      is_paused_{reader.is_paused_.load(std::memory_order_acquire)} {
   std::swap(format_context_ptr_, reader.format_context_ptr_);
   std::swap(codec_context_ptr_, reader.codec_context_ptr_);
 }
@@ -57,7 +57,7 @@ video_reader& video_reader::operator=(video_reader&& reader) noexcept {
   std::swap(format_context_ptr_, reader.format_context_ptr_);
   std::swap(codec_context_ptr_, reader.codec_context_ptr_);
   frame_decoder_ = std::move(reader.frame_decoder_);
-  is_paused_ = reader.is_paused_.load(std::memory_order_relaxed);
+  is_paused_ = reader.is_paused_.load(std::memory_order_acquire);
   return *this;
 }
 
@@ -131,17 +131,17 @@ bool video_reader::load_codec_context(
 void video_reader::decode_video() noexcept {
   av_packet packet{av_packet_alloc()};
   av_frame frame{av_frame_alloc()};
-  while (!is_terminated_.load(std::memory_order_relaxed)) {
-    if (is_paused_.load(std::memory_order_relaxed) ||
+  while (!is_terminated_.load(std::memory_order_acquire)) {
+    if (is_paused_.load(std::memory_order_acquire) ||
         av_read_frame(format_context_ptr_, packet.get()) < 0) {
       continue;
     }
     auto ret = avcodec_send_packet(codec_context_ptr_, packet.get());
     while (ret >= 0) {
-      if (is_terminated_.load(std::memory_order_relaxed)) {
+      if (is_terminated_.load(std::memory_order_acquire)) {
         return;
       }
-      if (is_paused_.load(std::memory_order_relaxed)) {
+      if (is_paused_.load(std::memory_order_acquire)) {
         continue;
       }
       ret = avcodec_receive_frame(codec_context_ptr_, frame.get());
@@ -155,9 +155,6 @@ void video_reader::decode_video() noexcept {
                         CV_8UC3);
       std::memcpy(frame_mat.data, converted_frame->data[0],
                   frame_mat.elemSize() * frame_mat.total());
-      if (is_terminated_.load(std::memory_order_relaxed)) {
-        break;
-      }
       event_handler_t::broadcast(
           events::new_frame_loaded{.frame = frame_mat,
                                    .frame_num = codec_context_ptr_->frame_num,

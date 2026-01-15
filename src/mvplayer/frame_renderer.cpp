@@ -30,7 +30,7 @@ frame_renderer::frame_renderer(frame_renderer&& renderer) noexcept
       width_{renderer.width_},
       height_{renderer.height_},
       padding_{renderer.padding_},
-      is_terminated_{renderer.is_terminated_.load(std::memory_order_relaxed)} {}
+      is_terminated_{renderer.is_terminated_.load(std::memory_order_acquire)} {}
 
 frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
   event_listener_ = std::move(renderer.event_listener_);
@@ -40,7 +40,7 @@ frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
   width_ = renderer.width_;
   height_ = renderer.height_;
   padding_ = renderer.padding_;
-  is_terminated_ = renderer.is_terminated_.load(std::memory_order_relaxed);
+  is_terminated_ = renderer.is_terminated_.load(std::memory_order_acquire);
   return *this;
 }
 
@@ -121,7 +121,7 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
                          .count();
     auto expected_render_time =
         playback_state_.first_frame_render_ts +
-        playback_state_.extra_time.load(std::memory_order_relaxed) +
+        playback_state_.extra_time.load(std::memory_order_acquire) +
         static_cast<uint64_t>(std::ceil(
             static_cast<double>(pts_in_ms * playback_state_.timebase.num) /
             playback_state_.timebase.den));
@@ -154,7 +154,7 @@ void frame_renderer::event_listener() noexcept {
   SDL_Event sdl_event;
   int64_t stop_counter = 0;
   bool is_paused = false;
-  while (!is_terminated_.load(std::memory_order_relaxed)) {
+  while (!is_terminated_.load(std::memory_order_acquire)) {
     while (SDL_PollEvent(&sdl_event)) {
       if (sdl_event.type == SDL_EVENT_QUIT) {
         std::ignore = request_termination();
@@ -171,7 +171,7 @@ void frame_renderer::event_listener() noexcept {
           } else {
             stop_counter += current_ts;
             playback_state_.extra_time.fetch_add(stop_counter,
-                                                 std::memory_order_relaxed);
+                                                 std::memory_order_acq_rel);
             stop_counter = 0;
           }
           is_paused = !is_paused;

@@ -35,11 +35,11 @@ class any {
       if (terminate_handler_ptr != nullptr) {
         terminate_handler_ptr->handle_termination_signal();
       }
-      terminated_.store(true, std::memory_order_relaxed);
+      terminated_.store(true, std::memory_order_release);
     }
 
     [[nodiscard]] bool terminated() const noexcept override {
-      return terminated_.load(std::memory_order_relaxed);
+      return terminated_.load(std::memory_order_acquire);
     }
 
     template <typename... arg_ts>
@@ -66,7 +66,7 @@ class any {
       using event_holder_t = typename processor_t::event_receiver_t;
       event_holder_t event_holder;
 
-      while (!terminated_.load(std::memory_order_relaxed)) {
+      while (!terminated_.load(std::memory_order_acquire)) {
         auto& output_queues = processor_.output_queues().get();
         for (auto&& [sender_name, rp] : processor_.input_queues().get()) {
           write::any* sender_mailbox{nullptr};

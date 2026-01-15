@@ -34,7 +34,7 @@ class video_reader
   video_reader& operator=(video_reader&& reader) noexcept;
 
   void handle_termination_signal() noexcept override {
-    is_terminated_.store(true, std::memory_order_relaxed);
+    is_terminated_.store(true, std::memory_order_release);
   }
 
   [[nodiscard]] std::optional<video_info> load_video(
@@ -42,7 +42,7 @@ class video_reader
   void operator()(
       [[maybe_unused]] const playback_toggled_event& event) override {
     is_paused_.store(!is_paused_.load(std::memory_order_relaxed),
-                     std::memory_order_relaxed);
+                     std::memory_order_release);
   }
   void on_startup(std::span<char* const> args) noexcept;
 

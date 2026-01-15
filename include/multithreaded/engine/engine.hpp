@@ -79,10 +79,10 @@ class engine {
   }
 
   [[nodiscard]] bool terminated() const noexcept {
-    return is_terminated_.load(std::memory_order_relaxed);
+    return is_terminated_.load(std::memory_order_acquire);
   }
   void terminate() noexcept {
-    is_terminated_.store(true, std::memory_order_relaxed);
+    is_terminated_.store(true, std::memory_order_release);
   }
 
   ~engine() noexcept;
