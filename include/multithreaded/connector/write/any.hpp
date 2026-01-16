@@ -38,7 +38,7 @@ class any {
       requires std::constructible_from<queue_elem_t, arg_ts...>
     [[nodiscard]] bool emplace(arg_ts&&... args) noexcept {
       if constexpr ((std::is_same_v<event_ts, queue_elem_t> || ...)) {
-        return write_port_.emplace(std::forward<event_ts>(args)...);
+        return write_port_.emplace(std::forward<arg_ts>(args)...);
       }
       return false;
     }
