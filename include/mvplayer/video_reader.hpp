@@ -10,6 +10,7 @@
 #include "info.hpp"
 #include "media_context.hpp"
 #include "processor/termination_handler.hpp"
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -49,6 +50,9 @@ class video_reader
 
  private:
   [[nodiscard]] std::span<AVStream*> get_media_streams() const noexcept;
+
+  void picture_frame_handler(AVFrame* frame) noexcept;
+  void audio_frame_handler(AVFrame* audio_frame) noexcept;
 
   void decode_video() noexcept;
 

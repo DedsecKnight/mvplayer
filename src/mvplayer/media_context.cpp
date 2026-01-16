@@ -1,5 +1,7 @@
 #include "media_context.hpp"
 
+#include <libavcodec/avcodec.h>
+
 #include <stdexcept>
 
 namespace mvplayer {
@@ -34,18 +36,14 @@ media_context& media_context::operator=(const media_context& ctx) {
   return *this;
 }
 
-media_context::media_context(media_context&& ctx) noexcept
-    : codec_ctx_ptr_{ctx.codec_ctx_ptr_}, codec_ptr_{ctx.codec_ptr_} {
-  ctx.codec_ptr_ = nullptr;
-  ctx.codec_ctx_ptr_ = nullptr;
+media_context::media_context(media_context&& ctx) noexcept {
+  std::swap(ctx.codec_ptr_, codec_ptr_);
+  std::swap(ctx.codec_ctx_ptr_, codec_ctx_ptr_);
 }
 
 media_context& media_context::operator=(media_context&& ctx) noexcept {
-  codec_ctx_ptr_ = ctx.codec_ctx_ptr_;
-  codec_ptr_ = ctx.codec_ptr_;
-
-  ctx.codec_ptr_ = nullptr;
-  ctx.codec_ctx_ptr_ = nullptr;
+  std::swap(ctx.codec_ptr_, codec_ptr_);
+  std::swap(ctx.codec_ctx_ptr_, codec_ctx_ptr_);
 
   return *this;
 }
@@ -57,21 +55,33 @@ media_context::~media_context() noexcept {
 }
 
 [[nodiscard]] AVCodecContext* media_context::initialize_codec_context(
-    const media_context& ctx) const noexcept {
+    const media_context& ctx) noexcept {
   AVCodecContext* codec_ctx_ptr = avcodec_alloc_context3(ctx.codec_ptr_);
   if (codec_ctx_ptr == nullptr) {
     return nullptr;
   }
-  AVCodecParameters ctx_params;
-  if (avcodec_parameters_from_context(&ctx_params, ctx.codec_ctx_ptr_) < 0) {
+
+  AVCodecParameters* ctx_params_ptr = avcodec_parameters_alloc();
+  if (ctx_params_ptr == nullptr) {
     avcodec_free_context(&codec_ctx_ptr);
     return nullptr;
   }
-  if (avcodec_parameters_to_context(codec_ctx_ptr_, &ctx_params) < 0) {
+
+  if (avcodec_parameters_from_context(ctx_params_ptr, ctx.codec_ctx_ptr_) < 0) {
+    avcodec_parameters_free(&ctx_params_ptr);
     avcodec_free_context(&codec_ctx_ptr);
     return nullptr;
   }
-  if (avcodec_open2(codec_ctx_ptr_, codec_ptr_, nullptr) < 0) {
+
+  if (avcodec_parameters_to_context(codec_ctx_ptr, ctx_params_ptr) < 0) {
+    avcodec_parameters_free(&ctx_params_ptr);
+    avcodec_free_context(&codec_ctx_ptr);
+    return nullptr;
+  }
+
+  avcodec_parameters_free(&ctx_params_ptr);
+
+  if (avcodec_open2(codec_ctx_ptr, ctx.codec_ptr_, nullptr) < 0) {
     avcodec_free_context(&codec_ctx_ptr);
     return nullptr;
   }

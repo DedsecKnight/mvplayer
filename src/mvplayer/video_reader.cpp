@@ -6,8 +6,8 @@
 #include "CLI/CLI.hpp"
 #include "events.hpp"
 #include "info.hpp"
+#include "media_context.hpp"
 #include "utils/conversion.hpp"
-#include "utils/owned.hpp"
 
 extern "C" {
 #include <libavcodec/codec.h>
@@ -126,16 +126,53 @@ std::span<AVStream*> video_reader::get_media_streams() const noexcept {
       static_cast<size_t>(format_context_ptr_->nb_streams)};
 }
 
+void video_reader::picture_frame_handler(AVFrame* picture_frame) noexcept {
+  auto converted_frame =
+      utils::convert_frame(picture_frame, AVPixelFormat::AV_PIX_FMT_RGB24);
+
+  cv::Mat frame_mat(converted_frame->height, converted_frame->width, CV_8UC3);
+  std::memcpy(frame_mat.data, converted_frame->data[0],
+              frame_mat.elemSize() * frame_mat.total());
+  event_handler_t::broadcast(
+      events::new_frame_loaded{.frame = frame_mat,
+                               .frame_num = frame_ctx_.codec_ctx().frame_num,
+                               .frame_pts = picture_frame->pts,
+                               .frame_pkt_dts = picture_frame->pkt_dts});
+}
+
+void video_reader::audio_frame_handler(
+    [[maybe_unused]] AVFrame* audio_frame) noexcept {
+  // TODO: implement this function
+
+  // auto& audio_codec_ctx = audio_ctx_.codec_ctx();
+  // const auto data_size = av_get_bytes_per_sample(audio_codec_ctx.sample_fmt);
+  // for (int32_t i = 0; i < audio_frame->nb_samples; ++i) {
+  //   for(int32_t ch = 0; ch < audio_codec_ctx.ch_layout.nb_channels; ++ch) {
+  //
+  //   }
+  // }
+}
+
 void video_reader::decode_video() noexcept {
   av_packet packet{av_packet_alloc()};
   av_frame frame{av_frame_alloc()};
+
   auto& frame_codec_ctx = frame_ctx_.codec_ctx();
+  auto& audio_codec_ctx = audio_ctx_.codec_ctx();
+
+  const auto audio_stream_index = av_find_best_stream(
+      format_context_ptr_, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+
   while (!is_terminated_.load(std::memory_order_acquire)) {
     if (is_paused_.load(std::memory_order_acquire) ||
         av_read_frame(format_context_ptr_, packet.get()) < 0) {
       continue;
     }
-    auto ret = avcodec_send_packet(&frame_codec_ctx, packet.get());
+    bool is_audio_packet = packet->stream_index == audio_stream_index;
+    auto* codec_ctx_ptr =
+        (is_audio_packet ? &audio_codec_ctx : &frame_codec_ctx);
+
+    auto ret = avcodec_send_packet(codec_ctx_ptr, packet.get());
     while (ret >= 0) {
       if (is_terminated_.load(std::memory_order_acquire)) {
         return;
@@ -143,22 +180,15 @@ void video_reader::decode_video() noexcept {
       if (is_paused_.load(std::memory_order_acquire)) {
         continue;
       }
-      ret = avcodec_receive_frame(&frame_codec_ctx, frame.get());
+      ret = avcodec_receive_frame(codec_ctx_ptr, frame.get());
       if (ret == AVERROR(EAGAIN)) {
         break;
       }
-      auto converted_frame =
-          utils::convert_frame(frame.get(), AVPixelFormat::AV_PIX_FMT_RGB24);
-
-      cv::Mat frame_mat(converted_frame->height, converted_frame->width,
-                        CV_8UC3);
-      std::memcpy(frame_mat.data, converted_frame->data[0],
-                  frame_mat.elemSize() * frame_mat.total());
-      event_handler_t::broadcast(
-          events::new_frame_loaded{.frame = frame_mat,
-                                   .frame_num = frame_codec_ctx.frame_num,
-                                   .frame_pts = frame->pts,
-                                   .frame_pkt_dts = frame->pkt_dts});
+      if (is_audio_packet) {
+        audio_frame_handler(frame.get());
+      } else {
+        picture_frame_handler(frame.get());
+      }
     }
   }
 }

@@ -25,8 +25,8 @@ class media_context {
   }
 
  private:
-  [[nodiscard]] AVCodecContext* initialize_codec_context(
-      const media_context& ctx) const noexcept;
+  [[nodiscard]] static AVCodecContext* initialize_codec_context(
+      const media_context& ctx) noexcept;
 
   AVCodecContext* codec_ctx_ptr_{nullptr};
   const AVCodec* codec_ptr_{nullptr};
