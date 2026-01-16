@@ -45,6 +45,7 @@ void video_reader::on_startup(std::span<char* const> args) noexcept {
 
 video_reader::video_reader(video_reader&& reader) noexcept
     : frame_ctx_{std::move(reader.frame_ctx_)},
+      audio_ctx_{std::move(reader.audio_ctx_)},
       frame_decoder_{std::move(reader.frame_decoder_)},
       is_paused_{reader.is_paused_.load(std::memory_order_acquire)} {
   std::swap(format_context_ptr_, reader.format_context_ptr_);
@@ -53,6 +54,7 @@ video_reader::video_reader(video_reader&& reader) noexcept
 video_reader& video_reader::operator=(video_reader&& reader) noexcept {
   std::swap(format_context_ptr_, reader.format_context_ptr_);
   frame_ctx_ = std::move(reader.frame_ctx_);
+  audio_ctx_ = std::move(reader.audio_ctx_);
   frame_decoder_ = std::move(reader.frame_decoder_);
   is_paused_ = reader.is_paused_.load(std::memory_order_acquire);
   return *this;
@@ -78,6 +80,10 @@ std::optional<video_info> video_reader::load_video(
     return stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO;
   });
 
+  auto audio_stream_it = std::ranges::find_if(streams, [](AVStream* stream) {
+    return stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO;
+  });
+
   if (video_stream_it == streams.end()) {
     spdlog::error("Unable to detect video stream for {}",
                   filename.filename().string());
@@ -87,6 +93,16 @@ std::optional<video_info> video_reader::load_video(
     const AVCodec* frame_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
     frame_ctx_ = media_context{codec_params_ptr, frame_codec};
+  }
+
+  if (audio_stream_it == streams.end()) {
+    spdlog::info("Unable to detect audio stream for {}",
+                 filename.filename().string());
+  } else {
+    AVCodecParameters* codec_params_ptr = (*audio_stream_it)->codecpar;
+    const AVCodec* audio_codec =
+        avcodec_find_decoder(codec_params_ptr->codec_id);
+    audio_ctx_ = media_context{codec_params_ptr, audio_codec};
   }
 
   return std::optional<video_info>{std::in_place,
