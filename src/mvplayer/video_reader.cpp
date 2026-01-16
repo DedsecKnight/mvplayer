@@ -1,5 +1,7 @@
 #include "video_reader.hpp"
 
+#include <libavutil/samplefmt.h>
+
 #include <atomic>
 #include <filesystem>
 
@@ -142,15 +144,27 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame) noexcept {
 
 void video_reader::audio_frame_handler(
     [[maybe_unused]] AVFrame* audio_frame) noexcept {
-  // TODO: implement this function
+  auto& audio_codec_ctx = audio_ctx_.codec_ctx();
 
-  // auto& audio_codec_ctx = audio_ctx_.codec_ctx();
-  // const auto data_size = av_get_bytes_per_sample(audio_codec_ctx.sample_fmt);
-  // for (int32_t i = 0; i < audio_frame->nb_samples; ++i) {
-  //   for(int32_t ch = 0; ch < audio_codec_ctx.ch_layout.nb_channels; ++ch) {
-  //
-  //   }
-  // }
+  const auto num_samples = audio_frame->nb_samples;
+  const auto per_sample_size =
+      static_cast<size_t>(av_get_bytes_per_sample(audio_codec_ctx.sample_fmt));
+  const auto sample_size = per_sample_size * num_samples;
+  const auto buffer_size = sample_size * audio_codec_ctx.ch_layout.nb_channels;
+
+  std::vector<uint8_t> audio_buffer(buffer_size);
+  size_t buffer_offset = 0;
+  for (int32_t i = 0; i < audio_frame->nb_samples; ++i) {
+    for (int32_t ch = 0; ch < audio_codec_ctx.ch_layout.nb_channels; ++ch) {
+      std::memcpy(&audio_buffer[buffer_offset],
+                  audio_frame->data[ch],  // NOLINT
+                  sample_size);
+      buffer_offset += sample_size;
+    }
+  }
+
+  event_handler_t::broadcast(
+      events::new_audio_samples_loaded{.samples = std::move(audio_buffer)});
 }
 
 void video_reader::decode_video() noexcept {

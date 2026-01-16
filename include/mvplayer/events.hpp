@@ -20,4 +20,8 @@ struct new_frame_loaded {
 struct new_video_loaded {
   video_info info;
 };
+
+struct new_audio_samples_loaded {
+  std::vector<uint8_t> samples;
+};
 }  // namespace mvplayer::events
