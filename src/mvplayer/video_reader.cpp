@@ -1,8 +1,5 @@
 #include "video_reader.hpp"
 
-#include <libavcodec/avcodec.h>
-#include <libavutil/pixfmt.h>
-
 #include <atomic>
 #include <filesystem>
 
@@ -47,15 +44,15 @@ void video_reader::on_startup(std::span<char* const> args) noexcept {
 }
 
 video_reader::video_reader(video_reader&& reader) noexcept
-    : frame_decoder_{std::move(reader.frame_decoder_)},
+    : frame_ctx_{std::move(reader.frame_ctx_)},
+      frame_decoder_{std::move(reader.frame_decoder_)},
       is_paused_{reader.is_paused_.load(std::memory_order_acquire)} {
   std::swap(format_context_ptr_, reader.format_context_ptr_);
-  std::swap(codec_context_ptr_, reader.codec_context_ptr_);
 }
 
 video_reader& video_reader::operator=(video_reader&& reader) noexcept {
   std::swap(format_context_ptr_, reader.format_context_ptr_);
-  std::swap(codec_context_ptr_, reader.codec_context_ptr_);
+  frame_ctx_ = std::move(reader.frame_ctx_);
   frame_decoder_ = std::move(reader.frame_decoder_);
   is_paused_ = reader.is_paused_.load(std::memory_order_acquire);
   return *this;
@@ -85,25 +82,22 @@ std::optional<video_info> video_reader::load_video(
     spdlog::error("Unable to detect video stream for {}",
                   filename.filename().string());
     return std::nullopt;
-  }
-
-  AVCodecParameters* codec_params_ptr = (*video_stream_it)->codecpar;
-  const AVCodec* codec_ptr = avcodec_find_decoder(codec_params_ptr->codec_id);
-
-  if (!load_codec_context(codec_ptr, codec_params_ptr)) {
-    spdlog::error("Error loading context for codec {}", codec_ptr->long_name);
-    return std::nullopt;
+  } else {
+    AVCodecParameters* codec_params_ptr = (*video_stream_it)->codecpar;
+    const AVCodec* frame_codec =
+        avcodec_find_decoder(codec_params_ptr->codec_id);
+    frame_ctx_ = media_context{codec_params_ptr, frame_codec};
   }
 
   return std::optional<video_info>{std::in_place,
                                    format_context_ptr_->iformat->long_name,
-                                   codec_ptr->long_name,
+                                   frame_ctx_.codec().long_name,
                                    (*video_stream_it)->avg_frame_rate,
                                    (*video_stream_it)->time_base,
-                                   codec_params_ptr->bit_rate,
+                                   (*video_stream_it)->codecpar->bit_rate,
                                    format_context_ptr_->duration,
-                                   codec_params_ptr->width,
-                                   codec_params_ptr->height};
+                                   (*video_stream_it)->codecpar->width,
+                                   (*video_stream_it)->codecpar->height};
 }
 
 std::span<AVStream*> video_reader::get_media_streams() const noexcept {
@@ -116,27 +110,16 @@ std::span<AVStream*> video_reader::get_media_streams() const noexcept {
       static_cast<size_t>(format_context_ptr_->nb_streams)};
 }
 
-bool video_reader::load_codec_context(
-    const AVCodec* codec_ptr, AVCodecParameters* codec_params_ptr) noexcept {
-  codec_context_ptr_ = avcodec_alloc_context3(codec_ptr);
-  if (avcodec_parameters_to_context(codec_context_ptr_, codec_params_ptr) < 0) {
-    return false;
-  }
-  if (avcodec_open2(codec_context_ptr_, codec_ptr, nullptr) < 0) {
-    return false;
-  }
-  return true;
-}
-
 void video_reader::decode_video() noexcept {
   av_packet packet{av_packet_alloc()};
   av_frame frame{av_frame_alloc()};
+  auto& frame_codec_ctx = frame_ctx_.codec_ctx();
   while (!is_terminated_.load(std::memory_order_acquire)) {
     if (is_paused_.load(std::memory_order_acquire) ||
         av_read_frame(format_context_ptr_, packet.get()) < 0) {
       continue;
     }
-    auto ret = avcodec_send_packet(codec_context_ptr_, packet.get());
+    auto ret = avcodec_send_packet(&frame_codec_ctx, packet.get());
     while (ret >= 0) {
       if (is_terminated_.load(std::memory_order_acquire)) {
         return;
@@ -144,7 +127,7 @@ void video_reader::decode_video() noexcept {
       if (is_paused_.load(std::memory_order_acquire)) {
         continue;
       }
-      ret = avcodec_receive_frame(codec_context_ptr_, frame.get());
+      ret = avcodec_receive_frame(&frame_codec_ctx, frame.get());
       if (ret == AVERROR(EAGAIN)) {
         break;
       }
@@ -157,7 +140,7 @@ void video_reader::decode_video() noexcept {
                   frame_mat.elemSize() * frame_mat.total());
       event_handler_t::broadcast(
           events::new_frame_loaded{.frame = frame_mat,
-                                   .frame_num = codec_context_ptr_->frame_num,
+                                   .frame_num = frame_codec_ctx.frame_num,
                                    .frame_pts = frame->pts,
                                    .frame_pkt_dts = frame->pkt_dts});
     }
@@ -167,9 +150,6 @@ void video_reader::decode_video() noexcept {
 video_reader::~video_reader() noexcept {
   if (frame_decoder_.joinable()) {
     frame_decoder_.join();
-  }
-  if (codec_context_ptr_ != nullptr) {
-    avcodec_free_context(&codec_context_ptr_);
   }
   if (format_context_ptr_ != nullptr) {
     avformat_free_context(format_context_ptr_);

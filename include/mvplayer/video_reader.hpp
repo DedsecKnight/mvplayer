@@ -8,6 +8,7 @@
 #include "events.hpp"
 #include "events/handler.hpp"
 #include "info.hpp"
+#include "media_context.hpp"
 #include "processor/termination_handler.hpp"
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -48,13 +49,11 @@ class video_reader
 
  private:
   [[nodiscard]] std::span<AVStream*> get_media_streams() const noexcept;
-  [[nodiscard]] bool load_codec_context(
-      const AVCodec* codec_ptr, AVCodecParameters* codec_params_ptr) noexcept;
 
   void decode_video() noexcept;
 
   AVFormatContext* format_context_ptr_{nullptr};
-  AVCodecContext* codec_context_ptr_{nullptr};
+  media_context frame_ctx_;
 
   // Separate thread used for decoding frames
   std::thread frame_decoder_;
