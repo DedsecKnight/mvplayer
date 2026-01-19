@@ -88,6 +88,8 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         playback_state_.expected_frame_no, event.payload().frame_num,
         event.payload().frame_num - playback_state_.expected_frame_no);
   }
+  while (is_paused_.load(std::memory_order_acquire)) {
+  }
 
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
@@ -153,7 +155,6 @@ frame_renderer::~frame_renderer() noexcept {
 void frame_renderer::event_listener() noexcept {
   SDL_Event sdl_event;
   int64_t stop_counter = 0;
-  bool is_paused = false;
   while (!is_terminated_.load(std::memory_order_acquire)) {
     while (SDL_PollEvent(&sdl_event)) {
       if (sdl_event.type == SDL_EVENT_QUIT) {
@@ -166,7 +167,8 @@ void frame_renderer::event_listener() noexcept {
               std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::high_resolution_clock::now().time_since_epoch())
                   .count();
-          if (!is_paused) {
+          const auto paused_status = is_paused_.load(std::memory_order_relaxed);
+          if (!paused_status) {
             stop_counter -= current_ts;
           } else {
             stop_counter += current_ts;
@@ -174,7 +176,7 @@ void frame_renderer::event_listener() noexcept {
                                                  std::memory_order_acq_rel);
             stop_counter = 0;
           }
-          is_paused = !is_paused;
+          is_paused_.store(!paused_status, std::memory_order_release);
           broadcast(events::playback_toggled{});
         }
       }

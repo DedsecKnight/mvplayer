@@ -62,6 +62,6 @@ class frame_renderer
   sdl_texture texture_{nullptr};
   video_playback_state playback_state_{};
   int32_t width_{}, height_{}, padding_{};
-  std::atomic<bool> is_terminated_{false};
+  std::atomic<bool> is_terminated_{false}, is_paused_{false};
 };
 }  // namespace mvplayer
