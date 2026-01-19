@@ -86,6 +86,9 @@ std::optional<video_info> video_reader::load_video(
     return stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO;
   });
 
+  picture_info picture_info{};
+  audio_info audio_info{};
+
   if (video_stream_it == streams.end()) {
     spdlog::error("Unable to detect video stream for {}",
                   filename.filename().string());
@@ -95,27 +98,38 @@ std::optional<video_info> video_reader::load_video(
     const AVCodec* frame_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
     frame_ctx_ = media_context{codec_params_ptr, frame_codec};
+
+    picture_info.format = frame_ctx_.codec().long_name;
+    picture_info.fps = (*video_stream_it)->avg_frame_rate;
+    picture_info.tbn = (*video_stream_it)->time_base;
+    picture_info.width = (*video_stream_it)->codecpar->width;
+    picture_info.height = (*video_stream_it)->codecpar->height;
   }
 
   if (audio_stream_it == streams.end()) {
     spdlog::info("Unable to detect audio stream for {}",
                  filename.filename().string());
+    audio_info.has_audio_stream = false;
   } else {
     AVCodecParameters* codec_params_ptr = (*audio_stream_it)->codecpar;
     const AVCodec* audio_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
     audio_ctx_ = media_context{codec_params_ptr, audio_codec};
+    std::string_view audio_format_name{
+        av_get_sample_fmt_name(audio_ctx_.codec_ctx().sample_fmt)};
+    spdlog::info("Audio format name: {}", audio_format_name);
+
+    audio_info.format = audio_ctx_.codec().long_name;
+    audio_info.tbn = (*audio_stream_it)->time_base;
+    audio_info.sample_format = audio_ctx_.codec_ctx().sample_fmt;
+    audio_info.num_channels = audio_ctx_.codec_ctx().ch_layout.nb_channels;
+    audio_info.frequency = audio_ctx_.codec_ctx().sample_rate;
+    audio_info.has_audio_stream = true;
   }
 
   return std::optional<video_info>{std::in_place,
                                    format_context_ptr_->iformat->long_name,
-                                   frame_ctx_.codec().long_name,
-                                   (*video_stream_it)->avg_frame_rate,
-                                   (*video_stream_it)->time_base,
-                                   (*video_stream_it)->codecpar->bit_rate,
-                                   format_context_ptr_->duration,
-                                   (*video_stream_it)->codecpar->width,
-                                   (*video_stream_it)->codecpar->height};
+                                   picture_info, audio_info};
 }
 
 std::span<AVStream*> video_reader::get_media_streams() const noexcept {
@@ -164,8 +178,11 @@ void video_reader::audio_frame_handler(
   }
 
   // TODO: uncomment this line when audio renderer is ready
-  // event_handler_t::broadcast(
-  //     events::new_audio_samples_loaded{.samples = std::move(audio_buffer)});
+  event_handler_t::broadcast(
+      events::new_audio_samples_loaded{.samples = std::move(audio_buffer),
+                                       .frame_num = audio_codec_ctx.frame_num,
+                                       .frame_pts = audio_frame->pts,
+                                       .frame_pkt_dts = audio_frame->pkt_dts});
 }
 
 void video_reader::decode_video() noexcept {

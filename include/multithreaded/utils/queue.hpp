@@ -11,7 +11,7 @@
 namespace multithreaded::utils {
 
 /// Single Producer - Single Consumer Lock-free Ring Buffer
-template <typename T, std::size_t Size = 3>
+template <typename T, std::size_t Size = 15>
   requires(std::has_single_bit(Size + 1))
 class spsc_queue {
  private:

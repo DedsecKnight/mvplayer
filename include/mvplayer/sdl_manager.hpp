@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_audio.h>
 
 #include "utils/owned.hpp"
 
@@ -22,6 +23,13 @@ class sdl_manager {
                                                 int32_t width,
                                                 int32_t height) noexcept {
     return get_instance().new_window(window_name, width, height);
+  }
+
+  [[nodiscard]] static sdl_audio_stream create_audio_stream(
+      SDL_AudioFormat audio_format, int32_t num_channels,
+      int32_t frequency) noexcept {
+    return get_instance().new_audio_stream(audio_format, num_channels,
+                                           frequency);
   }
 
   [[nodiscard]] static sdl_renderer create_renderer(
@@ -48,6 +56,16 @@ class sdl_manager {
   }
 
   // NOLINTNEXTLINE
+  [[nodiscard]] sdl_audio_stream new_audio_stream(SDL_AudioFormat audio_format,
+                                                  int32_t num_channels,
+                                                  int32_t frequency) {
+    const SDL_AudioSpec audio_spec{
+        .format = audio_format, .channels = num_channels, .freq = frequency};
+    return sdl_audio_stream{SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, nullptr, nullptr)};
+  }
+
+  // NOLINTNEXTLINE
   [[nodiscard]] sdl_renderer new_renderer(SDL_Window* window) noexcept {
     return sdl_renderer{SDL_CreateRenderer(window, nullptr)};
   }
@@ -62,7 +80,7 @@ class sdl_manager {
                                          width, height)};
   }
 
-  sdl_manager() { SDL_Init(SDL_INIT_VIDEO); }
+  sdl_manager() { SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO); }
   ~sdl_manager() { SDL_Quit(); }
 };
 }  // namespace mvplayer

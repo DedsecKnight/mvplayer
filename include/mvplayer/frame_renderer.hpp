@@ -10,11 +10,10 @@
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
 #include "processor/termination_handler.hpp"
+#include "utils/constants.hpp"
 #include "utils/owned.hpp"
 
 namespace mvplayer {
-
-static constexpr size_t CACHE_LINE_SIZE = 64;
 
 class frame_renderer
     : public multithreaded::events::handlers<events::new_frame_loaded,
@@ -27,8 +26,10 @@ class frame_renderer
       multithreaded::events::envelope<events::new_video_loaded>;
 
   struct video_playback_state {
-    alignas(CACHE_LINE_SIZE) std::atomic<uint64_t> extra_time;
-    std::array<uint8_t, CACHE_LINE_SIZE - sizeof(extra_time)> padding;
+    // TODO: implement move semantics
+    alignas(constants::CACHE_LINE_SIZE) std::atomic<uint64_t> extra_time;
+    std::array<uint8_t, constants::CACHE_LINE_SIZE - sizeof(extra_time)>
+        padding;
 
     AVRational timebase;
     uint64_t first_frame_render_ts;
@@ -50,8 +51,6 @@ class frame_renderer
   [[nodiscard]] explicit frame_renderer(int32_t padding);
   void operator()(const new_frame_loaded_event& event) override;
   void operator()(const new_video_loaded_event& event) override;
-  [[nodiscard]] bool render_frame(const cv::Mat& frame) const noexcept;
-  void start() const noexcept;
   ~frame_renderer() noexcept override;
 
  private:

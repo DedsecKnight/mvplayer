@@ -45,11 +45,11 @@ frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
 }
 
 void frame_renderer::operator()(const new_video_loaded_event& event) {
-  width_ = event.payload().info.width;
-  height_ = event.payload().info.height;
+  width_ = event.payload().info.picture.width;
+  height_ = event.payload().info.picture.height;
 
   playback_state_.first_frame_render_ts = 0;
-  playback_state_.timebase = event.payload().info.tbn;
+  playback_state_.timebase = event.payload().info.picture.tbn;
 
   int32_t padded_width = width_ + (2 * padding_);
   int32_t padded_height = height_ + (2 * padding_);

@@ -1,13 +1,17 @@
 #include "utils/conversion.hpp"
 
+#include <SDL3/SDL_audio.h>
+
 #include "utils/owned.hpp"
 
 extern "C" {
 #include <libavutil/imgutils.h>
+#include <libavutil/samplefmt.h>
 #include <libswscale/swscale.h>
 }
 
 namespace mvplayer::utils {
+
 av_frame convert_frame(AVFrame* src_frame, AVPixelFormat dst_format) {
   av_frame dest_frame{av_frame_alloc()};
   if (dest_frame == nullptr) {
@@ -37,5 +41,14 @@ av_frame convert_frame(AVFrame* src_frame, AVPixelFormat dst_format) {
             static_cast<int32_t*>(dest_frame->linesize));
   sws_freeContext(conversion_context);
   return dest_frame;
+}
+
+SDL_AudioFormat to_sdl_format(AVSampleFormat ff_sample_format) {
+  namespace ranges = std::ranges;
+  const auto* const mapping_it = ranges::find_if(
+      AUDIO_FORMAT_MAPPING, [ff_sample_format](const auto& audio_mapping) {
+        return audio_mapping.first == ff_sample_format;
+      });
+  return mapping_it->second;
 }
 }  // namespace mvplayer::utils

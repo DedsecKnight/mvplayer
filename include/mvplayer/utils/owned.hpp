@@ -52,11 +52,13 @@ OWNED_FFMPEG_RESOURCE(AVPacket)
 OWNED_SDL_RESOURCE(Window)
 OWNED_SDL_RESOURCE(Renderer)
 OWNED_SDL_RESOURCE(Texture)
+OWNED_SDL_RESOURCE(AudioStream)
 }  // namespace details
 
 using sdl_window = details::OwnedSdlWindow;
 using sdl_renderer = details::OwnedSdlRenderer;
 using sdl_texture = details::OwnedSdlTexture;
+using sdl_audio_stream = details::OwnedSdlAudioStream;
 
 using av_frame = details::OwnedAVFrame;
 using av_packet = details::OwnedAVPacket;

@@ -25,6 +25,7 @@ target_sources(
     src/mvplayer/utils/conversion.cpp
     src/mvplayer/utils/owned.cpp
     src/mvplayer/frame_renderer.cpp
+    src/mvplayer/audio_renderer.cpp
 
   PRIVATE
     FILE_SET vplayerPrivateHeaders
