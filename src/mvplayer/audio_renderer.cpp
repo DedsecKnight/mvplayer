@@ -87,6 +87,7 @@ void audio_renderer::operator()(
           std::chrono::high_resolution_clock::now().time_since_epoch())
           .count();
   if (!is_paused_) {
+    SDL_FlushAudioStream(audio_stream_.get());
     playback_state_.pause_toggled_ts = current_ts;
     SDL_PauseAudioStreamDevice(audio_stream_.get());
   } else {

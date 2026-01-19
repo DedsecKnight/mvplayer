@@ -88,8 +88,6 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         playback_state_.expected_frame_no, event.payload().frame_num,
         event.payload().frame_num - playback_state_.expected_frame_no);
   }
-  while (is_paused_.load(std::memory_order_acquire)) {
-  }
 
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
@@ -142,6 +140,12 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     std::ignore = event_handler_t::request_termination();
   }
 
+  // while (is_paused_.load(std::memory_order_acquire)) {
+  //   if (!is_terminated_.load(std::memory_order_acquire)) {
+  //     return;
+  //   }
+  // }
+  //
   playback_state_.expected_frame_no++;
 }
 
@@ -149,7 +153,6 @@ frame_renderer::~frame_renderer() noexcept {
   if (event_listener_.joinable()) {
     event_listener_.join();
   }
-  SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
 void frame_renderer::event_listener() noexcept {

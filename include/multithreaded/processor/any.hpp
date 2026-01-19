@@ -8,6 +8,7 @@
 #include "connector/read/port.hpp"
 #include "connector/write/any.hpp"
 #include "connector/write/port.hpp"
+#include "processor/interruptible.hpp"
 #include "processor/termination_handler.hpp"
 
 namespace multithreaded::processor {
@@ -67,6 +68,14 @@ class any {
       event_holder_t event_holder;
 
       while (!terminated_.load(std::memory_order_acquire)) {
+        if constexpr (std::is_base_of_v<processor::interruptible_processor,
+                                        processor_t>) {
+          while (processor_.halt_requested()) {
+            if (terminated_.load(std::memory_order_acquire)) {
+              return;
+            }
+          }
+        }
         auto& output_queues = processor_.output_queues().get();
         for (auto&& [sender_name, rp] : processor_.input_queues().get()) {
           write::any* sender_mailbox{nullptr};

@@ -44,7 +44,8 @@ class audio_renderer
 
   void on_startup([[maybe_unused]] std::span<char* const> args) noexcept {}
   void handle_termination_signal() noexcept override {
-    SDL_ClearAudioStream(audio_stream_.get());
+    SDL_FlushAudioStream(audio_stream_.get());
+    SDL_PauseAudioStreamDevice(audio_stream_.get());
   }
 
   void operator()(const new_audio_samples_loaded_event& event) override;
