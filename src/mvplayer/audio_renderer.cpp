@@ -3,8 +3,6 @@
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_timer.h>
 
-#include <atomic>
-
 #include "sdl_manager.hpp"
 #include "utils/conversion.hpp"
 #include "utils/owned.hpp"
@@ -40,8 +38,7 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
                          std::chrono::seconds(event.payload().frame_pts))
                          .count();
     auto expected_render_time =
-        playback_state_.first_frame_render_ts +
-        playback_state_.extra_time.load(std::memory_order_acquire) +
+        playback_state_.first_frame_render_ts + playback_state_.extra_time +
         static_cast<uint64_t>(std::ceil(
             static_cast<double>(pts_in_ms * playback_state_.timebase.num) /
             playback_state_.timebase.den));
@@ -85,9 +82,15 @@ void audio_renderer::operator()(const new_video_loaded_event& event) {
 
 void audio_renderer::operator()(
     [[maybe_unused]] const playback_toggled_event& event) {
+  const auto current_ts =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::high_resolution_clock::now().time_since_epoch())
+          .count();
   if (!is_paused_) {
+    playback_state_.pause_toggled_ts = current_ts;
     SDL_PauseAudioStreamDevice(audio_stream_.get());
   } else {
+    playback_state_.extra_time += current_ts - playback_state_.pause_toggled_ts;
     SDL_ResumeAudioStreamDevice(audio_stream_.get());
   }
   is_paused_ = !is_paused_;

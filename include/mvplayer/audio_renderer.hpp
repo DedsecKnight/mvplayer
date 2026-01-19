@@ -3,7 +3,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_audio.h>
 
-#include <atomic>
 #include <cstdint>
 #include <opencv2/core.hpp>
 
@@ -11,7 +10,6 @@
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
 #include "processor/termination_handler.hpp"
-#include "utils/constants.hpp"
 #include "utils/owned.hpp"
 
 namespace mvplayer {
@@ -30,13 +28,8 @@ class audio_renderer
       multithreaded::events::envelope<events::playback_toggled>;
 
   struct audio_playback_state {
-    // TODO: implement move semantics
-    alignas(constants::CACHE_LINE_SIZE) std::atomic<uint64_t> extra_time;
-    std::array<uint8_t, constants::CACHE_LINE_SIZE - sizeof(extra_time)>
-        padding;
-
-    AVRational timebase;
-    uint64_t first_frame_render_ts;
+    AVRational timebase{};
+    uint64_t pause_toggled_ts{}, extra_time{}, first_frame_render_ts{};
     int64_t expected_frame_no{1};
   };
 
