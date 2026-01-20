@@ -49,7 +49,7 @@ TEST(SPSCQueueTest, BasicDataType) {
 }
 
 TEST(SPSCQueueTest, PushFullQueue) {
-  multithreaded::utils::spsc_queue<int> queue{};
+  multithreaded::utils::spsc_queue<int, 3> queue{};
   for (int i = 0; i < 3; i++) {
     EXPECT_EQ(queue.push(i), true);
   }
