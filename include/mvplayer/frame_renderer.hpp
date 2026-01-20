@@ -28,13 +28,47 @@ class frame_renderer
       multithreaded::events::envelope<events::new_video_loaded>;
 
   struct video_playback_state {
-    // TODO: implement move semantics
+    video_playback_state() = default;
+    video_playback_state(const video_playback_state& state)
+        : extra_time{state.extra_time.load(std::memory_order_acquire)},
+          timebase{state.timebase},
+          first_frame_render_ts{state.first_frame_render_ts},
+          expected_frame_no{state.expected_frame_no} {}
+
+    video_playback_state& operator=(
+        const video_playback_state& state) noexcept {
+      if (this == &state) {
+        return *this;
+      }
+      extra_time = state.extra_time.load(std::memory_order_acquire);
+      timebase = state.timebase;
+      first_frame_render_ts = state.first_frame_render_ts;
+      expected_frame_no = state.expected_frame_no;
+      return *this;
+    }
+
+    video_playback_state(video_playback_state&& state) noexcept
+        : extra_time{state.extra_time.load(std::memory_order_acquire)},
+          timebase{state.timebase},
+          first_frame_render_ts{state.first_frame_render_ts},
+          expected_frame_no{state.expected_frame_no} {}
+
+    video_playback_state& operator=(video_playback_state&& state) noexcept {
+      extra_time = state.extra_time.load(std::memory_order_acquire);
+      timebase = state.timebase;
+      first_frame_render_ts = state.first_frame_render_ts;
+      expected_frame_no = state.expected_frame_no;
+      return *this;
+    }
+
+    ~video_playback_state() = default;
+
     alignas(constants::CACHE_LINE_SIZE) std::atomic<uint64_t> extra_time;
     std::array<uint8_t, constants::CACHE_LINE_SIZE - sizeof(extra_time)>
-        padding;
+        padding{};
 
-    AVRational timebase;
-    uint64_t first_frame_render_ts;
+    AVRational timebase{};
+    uint64_t first_frame_render_ts{};
     int64_t expected_frame_no{1};
   };
 
@@ -65,7 +99,7 @@ class frame_renderer
   sdl_window window_{nullptr};
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
-  video_playback_state playback_state_{};
+  video_playback_state playback_state_;
   int32_t width_{}, height_{}, padding_{};
   std::atomic<bool> is_terminated_{false}, is_paused_{false};
 };

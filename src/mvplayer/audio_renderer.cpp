@@ -8,12 +8,15 @@
 #include "utils/owned.hpp"
 
 namespace mvplayer {
-// TODO: implement move for playback_state_
 audio_renderer::audio_renderer(audio_renderer&& renderer) noexcept
-    : audio_stream_{renderer.audio_stream_.release()} {}
+    : playback_state_{renderer.playback_state_},
+      audio_stream_{renderer.audio_stream_.release()},
+      is_paused_{renderer.is_paused_} {}
 
 audio_renderer& audio_renderer::operator=(audio_renderer&& renderer) noexcept {
+  playback_state_ = renderer.playback_state_;
   audio_stream_ = sdl_audio_stream{renderer.audio_stream_.release()};
+  is_paused_ = renderer.is_paused_;
   return *this;
 }
 

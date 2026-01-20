@@ -177,7 +177,6 @@ void video_reader::audio_frame_handler(
     }
   }
 
-  // TODO: uncomment this line when audio renderer is ready
   event_handler_t::broadcast(
       events::new_audio_samples_loaded{.samples = std::move(audio_buffer),
                                        .frame_num = audio_codec_ctx.frame_num,

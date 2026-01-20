@@ -27,6 +27,7 @@ frame_renderer::frame_renderer(frame_renderer&& renderer) noexcept
       window_{renderer.window_.release()},
       renderer_{renderer.renderer_.release()},
       texture_{renderer.texture_.release()},
+      playback_state_{std::move(renderer.playback_state_)},
       width_{renderer.width_},
       height_{renderer.height_},
       padding_{renderer.padding_},
@@ -37,6 +38,7 @@ frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
   window_ = sdl_window{renderer.window_.release()};
   renderer_ = sdl_renderer{renderer.renderer_.release()};
   texture_ = sdl_texture{renderer.texture_.release()};
+  playback_state_ = std::move(renderer.playback_state_);
   width_ = renderer.width_;
   height_ = renderer.height_;
   padding_ = renderer.padding_;
