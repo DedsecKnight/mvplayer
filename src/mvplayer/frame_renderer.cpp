@@ -142,12 +142,6 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     std::ignore = event_handler_t::request_termination();
   }
 
-  // while (is_paused_.load(std::memory_order_acquire)) {
-  //   if (!is_terminated_.load(std::memory_order_acquire)) {
-  //     return;
-  //   }
-  // }
-  //
   playback_state_.expected_frame_no++;
 }
 
