@@ -24,7 +24,7 @@ class media_context {
     return *codec_ctx_ptr_;
   }
 
- private:
+ protected:
   [[nodiscard]] static AVCodecContext* initialize_codec_context(
       const media_context& ctx) noexcept;
 

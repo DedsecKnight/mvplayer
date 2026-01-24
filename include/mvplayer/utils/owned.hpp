@@ -5,6 +5,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
+#include <libswresample/swresample.h>
 }
 
 #include <SDL3/SDL.h>
@@ -14,6 +15,7 @@ namespace mvplayer {
 namespace deallocator {
 void AVFrameDeallocator(AVFrame* frame);
 void AVPacketDeallocator(AVPacket* packet);
+void SwrContextDeallocator(SwrContext* ctx);
 }  // namespace deallocator
 
 namespace details {
@@ -48,6 +50,7 @@ namespace details {
 
 OWNED_FFMPEG_RESOURCE(AVFrame)
 OWNED_FFMPEG_RESOURCE(AVPacket)
+OWNED_FFMPEG_RESOURCE(SwrContext)
 
 OWNED_SDL_RESOURCE(Window)
 OWNED_SDL_RESOURCE(Renderer)
@@ -62,6 +65,7 @@ using sdl_audio_stream = details::OwnedSdlAudioStream;
 
 using av_frame = details::OwnedAVFrame;
 using av_packet = details::OwnedAVPacket;
+using swr_context = details::OwnedSwrContext;
 
 #undef OWNED_FFMPEG_RESOURCE
 #undef OWNED_SDL_RESOURCE

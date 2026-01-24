@@ -19,7 +19,6 @@ class VideoPlayerRecipe(ConanFile):
     def configure(self):
         self.options["ffmpeg"].with_pulse = False
         self.options["ffmpeg"].avdevice = False
-        self.options["ffmpeg"].swresample = False
         self.options["ffmpeg"].postproc = False
         self.options["ffmpeg"].with_avfoundation = False
         self.options["ffmpeg"].with_coreimage = False

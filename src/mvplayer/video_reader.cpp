@@ -114,7 +114,7 @@ std::optional<video_info> video_reader::load_video(
     AVCodecParameters* codec_params_ptr = (*audio_stream_it)->codecpar;
     const AVCodec* audio_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
-    audio_ctx_ = media_context{codec_params_ptr, audio_codec};
+    audio_ctx_ = audio_context{codec_params_ptr, audio_codec};
     std::string_view audio_format_name{
         av_get_sample_fmt_name(audio_ctx_.codec_ctx().sample_fmt)};
     spdlog::info("Audio format name: {}", audio_format_name);
@@ -160,21 +160,18 @@ void video_reader::audio_frame_handler(
     [[maybe_unused]] AVFrame* audio_frame) noexcept {
   auto& audio_codec_ctx = audio_ctx_.codec_ctx();
 
-  const auto num_samples = audio_frame->nb_samples;
-  const auto sample_size =
-      static_cast<size_t>(av_get_bytes_per_sample(audio_codec_ctx.sample_fmt));
-  const auto buffer_size =
-      sample_size * num_samples * audio_codec_ctx.ch_layout.nb_channels;
-
-  std::vector<uint8_t> audio_buffer(buffer_size);
-  size_t buffer_offset = 0;
-  for (int32_t i = 0; i < audio_frame->nb_samples; ++i) {
-    for (int32_t ch = 0; ch < audio_codec_ctx.ch_layout.nb_channels; ++ch) {
-      std::memcpy(&audio_buffer[buffer_offset],
-                  &audio_frame->data[ch][sample_size * i],  // NOLINT
-                  sample_size);
-      buffer_offset += sample_size;
-    }
+  std::vector<uint8_t> audio_buffer;
+  if (av_sample_fmt_is_planar(
+          static_cast<AVSampleFormat>(audio_frame->format)) == 1) {
+    audio_buffer = audio_ctx_.pack_planar_audio_sample(audio_frame);
+  } else {
+    const auto num_samples = audio_frame->nb_samples;
+    const auto sample_size = static_cast<size_t>(
+        av_get_bytes_per_sample(audio_codec_ctx.sample_fmt));
+    const auto buffer_size =
+        sample_size * num_samples * audio_codec_ctx.ch_layout.nb_channels;
+    audio_buffer.resize(buffer_size);
+    std::memcpy(audio_buffer.data(), audio_frame->data[0], audio_buffer.size());
   }
 
   event_handler_t::broadcast(

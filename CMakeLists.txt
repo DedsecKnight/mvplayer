@@ -22,6 +22,7 @@ target_sources(
   PRIVATE
     src/mvplayer/video_reader.cpp
     src/mvplayer/media_context.cpp
+    src/mvplayer/audio_context.cpp
     src/mvplayer/utils/conversion.cpp
     src/mvplayer/utils/owned.cpp
     src/mvplayer/frame_renderer.cpp
