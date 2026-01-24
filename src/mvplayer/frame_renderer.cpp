@@ -86,7 +86,7 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
 void frame_renderer::operator()(const new_frame_loaded_event& event) {
   if (event.payload().frame_num != playback_state_.expected_frame_no) {
     spdlog::critical(
-        "Expected frame no {}, {} found. Lost {} frames",
+        "[frame-renderer] Expected frame no {}, {} found. Lost {} frames",
         playback_state_.expected_frame_no, event.payload().frame_num,
         event.payload().frame_num - playback_state_.expected_frame_no);
   }

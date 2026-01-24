@@ -23,7 +23,7 @@ audio_renderer& audio_renderer::operator=(audio_renderer&& renderer) noexcept {
 void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
   if (event.payload().frame_num != playback_state_.expected_frame_no) {
     spdlog::critical(
-        "Expected frame no {}, {} found. Lost {} frames",
+        "[audio-renderer] Expected frame no {}, {} found. Lost {} frames",
         playback_state_.expected_frame_no, event.payload().frame_num,
         event.payload().frame_num - playback_state_.expected_frame_no);
   }
@@ -68,6 +68,9 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
 }
 
 void audio_renderer::operator()(const new_video_loaded_event& event) {
+  if (!event.payload().info.audio.has_audio_stream) {
+    return;
+  }
   const auto& audio_info = event.payload().info.audio;
   const auto sdl_format = utils::to_sdl_format(audio_info.sample_format);
   audio_stream_ = sdl_manager::create_audio_stream(
