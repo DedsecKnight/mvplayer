@@ -127,10 +127,11 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         static_cast<uint64_t>(std::ceil(
             static_cast<double>(pts_in_ms * playback_state_.timebase.num) /
             playback_state_.timebase.den));
-    auto wait_time = expected_render_time - curr_frame_ts;
-    if (wait_time < 0) {
-      spdlog::critical("Frame renderer is {}ms behind", -wait_time);
+    if (expected_render_time < curr_frame_ts) {
+      spdlog::critical("Frame renderer is {}ms behind",
+                       curr_frame_ts - expected_render_time);
     } else {
+      auto wait_time = expected_render_time - curr_frame_ts;
       SDL_Delay(wait_time);
       spdlog::trace("Slept for {}ms", wait_time);
     }
