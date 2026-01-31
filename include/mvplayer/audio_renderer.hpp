@@ -29,7 +29,8 @@ class audio_renderer
 
   struct audio_playback_state {
     AVRational timebase{};
-    uint64_t pause_toggled_ts{}, extra_time{}, first_frame_render_ts{};
+    uint64_t pause_toggled_ts{}, extra_time{}, first_frame_render_ts{},
+        first_frame_pts{};
     int64_t expected_frame_no{1};
   };
 

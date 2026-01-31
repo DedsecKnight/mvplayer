@@ -142,7 +142,57 @@ std::span<AVStream*> video_reader::get_media_streams() const noexcept {
       static_cast<size_t>(format_context_ptr_->nb_streams)};
 }
 
-void video_reader::picture_frame_handler(AVFrame* picture_frame) noexcept {
+[[nodiscard]] int64_t video_reader::next_seek_request() noexcept {
+  auto next_seek_request = seek_request_.load(std::memory_order_acquire);
+
+  // NOTE: Here, we do a CAS operation to make sure that we got the most
+  // updated seek request
+  while (!seek_request_.compare_exchange_weak(next_seek_request, -1,
+                                              std::memory_order_relaxed)) {
+  }
+  return next_seek_request;
+}
+
+[[nodiscard]] video_reader::seek_result
+video_reader::process_seek_request() noexcept {
+  auto curr_seek_request = next_seek_request();
+  if (curr_seek_request == -1) {
+    return seek_result::no_seek_request_found;
+  }
+  if (av_seek_frame(format_context_ptr_, -1, curr_seek_request,
+                    AVSEEK_FLAG_BACKWARD) < 0) {
+    return seek_result::seek_error;
+  }
+
+  audio_ctx_.flush_codec_context();
+  frame_ctx_.flush_codec_context();
+
+  return seek_result::seek_request_processed;
+}
+
+void video_reader::handle_seek_request(seek_direction direction) noexcept {
+  int32_t multiplier = (direction == seek_direction::backward ? -1 : 1);
+  const auto timebase = frame_ctx_.stream().time_base;
+  const auto most_recent_pts_ts =
+      av_rescale_q(frame_ctx_.most_recent_pts(), timebase,
+                   AVRational{.num = 1, .den = AV_TIME_BASE});
+  int64_t curr_seek_pos = seek_request_.load(std::memory_order_acquire);
+  const int64_t delta_pts = seek_unit_secs * multiplier * AV_TIME_BASE;
+  int64_t new_seek_pos = std::clamp(
+      (curr_seek_pos == -1 ? most_recent_pts_ts : curr_seek_pos) + delta_pts,
+      0L, format_context_ptr_->duration);
+  while (!seek_request_.compare_exchange_weak(curr_seek_pos, new_seek_pos)) {
+    const auto most_recent_pts_ts =
+        av_rescale_q(frame_ctx_.most_recent_pts(), timebase,
+                     AVRational{.num = 1, .den = AV_TIME_BASE});
+    new_seek_pos = std::clamp(
+        (curr_seek_pos == -1 ? most_recent_pts_ts : curr_seek_pos) + delta_pts,
+        0L, format_context_ptr_->duration);
+  }
+}
+
+void video_reader::picture_frame_handler(AVFrame* picture_frame,
+                                         bool reset_frame_sequence) noexcept {
   auto converted_frame =
       utils::convert_frame(picture_frame, AVPixelFormat::AV_PIX_FMT_RGB24);
 
@@ -153,11 +203,12 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame) noexcept {
       events::new_frame_loaded{.frame = frame_mat,
                                .frame_num = frame_ctx_.codec_ctx().frame_num,
                                .frame_pts = picture_frame->pts,
-                               .frame_pkt_dts = picture_frame->pkt_dts});
+                               .frame_pkt_dts = picture_frame->pkt_dts,
+                               .reset_frame_sequence = reset_frame_sequence});
 }
 
-void video_reader::audio_frame_handler(
-    [[maybe_unused]] AVFrame* audio_frame) noexcept {
+void video_reader::audio_frame_handler([[maybe_unused]] AVFrame* audio_frame,
+                                       bool reset_frame_sequence) noexcept {
   auto& audio_codec_ctx = audio_ctx_.codec_ctx();
 
   std::vector<uint8_t> audio_buffer;
@@ -174,17 +225,16 @@ void video_reader::audio_frame_handler(
     std::memcpy(audio_buffer.data(), audio_frame->data[0], audio_buffer.size());
   }
 
-  event_handler_t::broadcast(
-      events::new_audio_samples_loaded{.samples = std::move(audio_buffer),
-                                       .frame_num = audio_codec_ctx.frame_num,
-                                       .frame_pts = audio_frame->pts,
-                                       .frame_pkt_dts = audio_frame->pkt_dts});
+  event_handler_t::broadcast(events::new_audio_samples_loaded{
+      .samples = std::move(audio_buffer),
+      .frame_num = audio_codec_ctx.frame_num,
+      .frame_pts = audio_frame->pts,
+      .frame_pkt_dts = audio_frame->pkt_dts,
+      .reset_frame_sequence = reset_frame_sequence});
 }
 
 void video_reader::operator()(const seek_request_event& event) {
-  auto seek_direction = event.payload().direction;
-  audio_ctx_.handle_seek_request(seek_direction);
-  frame_ctx_.handle_seek_request(seek_direction);
+  handle_seek_request(event.payload().direction);
 }
 
 void video_reader::decode_video() noexcept {
@@ -192,6 +242,7 @@ void video_reader::decode_video() noexcept {
   av_frame frame{av_frame_alloc()};
 
   std::array<media_context*, 2> media_contexts{&frame_ctx_, &audio_ctx_};
+  std::array<bool, 2> reset_frame_seq{true, true};
 
   // NOTE: use std::vector here for auto type deduction
   std::vector frame_handlers{
@@ -206,9 +257,12 @@ void video_reader::decode_video() noexcept {
       continue;
     }
 
-    if (!std::ranges::all_of(media_contexts, [](media_context* ctx) {
-          return ctx->process_seek_request();
-        })) {
+    const auto seek_result = process_seek_request();
+    if (seek_result == seek_result::seek_request_processed) {
+      reset_frame_seq[0] = reset_frame_seq[1] = true;
+    }
+
+    if (seek_result == seek_result::seek_error) {
       spdlog::error("Error processing seek request");
       std::ignore = request_termination();
       return;
@@ -236,7 +290,9 @@ void video_reader::decode_video() noexcept {
         break;
       }
       media_contexts.at(context_index)->update_most_recent_pts(frame->pts);
-      frame_handlers.at(context_index)(frame.get());
+      frame_handlers.at(context_index)(frame.get(),
+                                       reset_frame_seq.at(context_index));
+      reset_frame_seq.at(context_index) = false;
     }
   }
 }

@@ -33,6 +33,7 @@ class frame_renderer
         : extra_time{state.extra_time.load(std::memory_order_acquire)},
           timebase{state.timebase},
           first_frame_render_ts{state.first_frame_render_ts},
+          first_frame_pts{state.first_frame_pts},
           expected_frame_no{state.expected_frame_no} {}
 
     video_playback_state& operator=(
@@ -43,6 +44,7 @@ class frame_renderer
       extra_time = state.extra_time.load(std::memory_order_acquire);
       timebase = state.timebase;
       first_frame_render_ts = state.first_frame_render_ts;
+      first_frame_pts = state.first_frame_pts;
       expected_frame_no = state.expected_frame_no;
       return *this;
     }
@@ -51,12 +53,14 @@ class frame_renderer
         : extra_time{state.extra_time.load(std::memory_order_acquire)},
           timebase{state.timebase},
           first_frame_render_ts{state.first_frame_render_ts},
+          first_frame_pts{state.first_frame_pts},
           expected_frame_no{state.expected_frame_no} {}
 
     video_playback_state& operator=(video_playback_state&& state) noexcept {
       extra_time = state.extra_time.load(std::memory_order_acquire);
       timebase = state.timebase;
       first_frame_render_ts = state.first_frame_render_ts;
+      first_frame_pts = state.first_frame_pts;
       expected_frame_no = state.expected_frame_no;
       return *this;
     }
@@ -68,7 +72,7 @@ class frame_renderer
         padding{};
 
     AVRational timebase{};
-    uint64_t first_frame_render_ts{};
+    uint64_t first_frame_render_ts{}, first_frame_pts{};
     int64_t expected_frame_no{1};
   };
 

@@ -6,7 +6,6 @@
 #include <atomic>
 #include <stdexcept>
 
-#include "info.hpp"
 #include "utils/owned.hpp"
 
 namespace mvplayer {
@@ -71,57 +70,19 @@ media_context::~media_context() noexcept {
   }
 }
 
-[[nodiscard]] bool media_context::process_seek_request() noexcept {
-  auto curr_seek_request = next_seek_request();
-  if (curr_seek_request == -1) {
-    return true;
-  }
-  if (av_seek_frame(format_ctx_ptr_, stream_->index, curr_seek_request,
-                    AVSEEK_FLAG_BACKWARD) < 0) {
-    return false;
-  }
-  avcodec_flush_buffers(codec_ctx_ptr_);
-  avcodec_send_packet(codec_ctx_ptr_, nullptr);
-
-  av_frame frame{av_frame_alloc()};
-
-  while (avcodec_receive_frame(codec_ctx_ptr_, frame.get()) != AVERROR_EOF) {
-  }
-
-  return true;
-}
-
-void media_context::handle_seek_request(seek_direction direction) noexcept {
-  int32_t multiplier = (direction == seek_direction::backward ? -1 : 1);
-  int64_t curr_seek_pos = seek_request_.load(std::memory_order_acquire);
-  const int64_t delta_pts = av_rescale_q(seek_unit_secs * AV_TIME_BASE,
-                                         AV_TIME_BASE_Q, stream_->time_base) *
-                            multiplier;
-  int64_t new_seek_pos =
-      (curr_seek_pos == -1 ? most_recent_pts_.load(std::memory_order_acquire)
-                           : curr_seek_pos) +
-      delta_pts;
-  while (!seek_request_.compare_exchange_weak(curr_seek_pos, new_seek_pos)) {
-    new_seek_pos =
-        (curr_seek_pos == -1 ? most_recent_pts_.load(std::memory_order_acquire)
-                             : curr_seek_pos) +
-        delta_pts;
-  }
-}
-
-[[nodiscard]] int64_t media_context::next_seek_request() noexcept {
-  auto next_seek_request = seek_request_.load(std::memory_order_acquire);
-
-  // NOTE: Here, we do a CAS operation to make sure that we got the most
-  // updated seek request
-  while (!seek_request_.compare_exchange_weak(next_seek_request, -1,
-                                              std::memory_order_relaxed)) {
-  }
-  return next_seek_request;
+[[nodiscard]] int64_t media_context::most_recent_pts() const noexcept {
+  return most_recent_pts_.load(std::memory_order_acquire);
 }
 
 void media_context::update_most_recent_pts(int64_t pts) noexcept {
   most_recent_pts_.store(pts, std::memory_order_release);
+}
+
+void media_context::flush_codec_context() const noexcept {
+  if (codec_ctx_ptr_ == nullptr) {
+    return;
+  }
+  avcodec_flush_buffers(codec_ctx_ptr_);
 }
 
 [[nodiscard]] AVCodecContext* media_context::initialize_codec_context(

@@ -35,7 +35,12 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
 
   if (playback_state_.expected_frame_no == 1) {
     playback_state_.first_frame_render_ts = curr_frame_ts;
+    playback_state_.first_frame_pts = event.payload().frame_pts;
     SDL_ResumeAudioStreamDevice(audio_stream_.get());
+  } else if (event.payload().reset_frame_sequence) {
+    playback_state_.first_frame_render_ts = curr_frame_ts;
+    playback_state_.first_frame_pts = event.payload().frame_pts;
+    playback_state_.extra_time = 0;
   } else {
     auto pts_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::seconds(event.payload().frame_pts))

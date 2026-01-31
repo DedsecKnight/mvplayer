@@ -113,20 +113,23 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
                 curr_frame_ts, event.payload().frame_pts,
                 playback_state_.timebase.num, playback_state_.timebase.den);
 
-  if (playback_state_.expected_frame_no == 1) {
+  if (playback_state_.expected_frame_no == 1 ||
+      event.payload().reset_frame_sequence) {
     // If no frames are rendered yet, use curr_frame_ts as base timestamp for
     // future renders
     playback_state_.first_frame_render_ts = curr_frame_ts;
+    playback_state_.first_frame_pts = event.payload().frame_pts;
+    playback_state_.extra_time.store(0, std::memory_order_release);
   } else {
     auto pts_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         std::chrono::seconds(event.payload().frame_pts))
+                         std::chrono::seconds(event.payload().frame_pts -
+                                              playback_state_.first_frame_pts))
                          .count();
     auto expected_render_time =
         playback_state_.first_frame_render_ts +
         playback_state_.extra_time.load(std::memory_order_acquire) +
-        static_cast<uint64_t>(std::ceil(
-            static_cast<double>(pts_in_ms * playback_state_.timebase.num) /
-            playback_state_.timebase.den));
+        av_rescale_q(pts_in_ms, playback_state_.timebase,
+                     AVRational{.num = 1, .den = 1});
     if (expected_render_time < curr_frame_ts) {
       spdlog::critical("Frame renderer is {}ms behind",
                        curr_frame_ts - expected_render_time);

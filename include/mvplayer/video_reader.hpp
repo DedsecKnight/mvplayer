@@ -28,6 +28,14 @@ class video_reader
   using seek_request_event =
       multithreaded::events::envelope<events::seek_request>;
 
+  enum class seek_result : uint8_t {
+    no_seek_request_found,
+    seek_request_processed,
+    seek_error
+  };
+
+  static constexpr int64_t seek_unit_secs = 5;
+
  public:
   ~video_reader() noexcept override;
 
@@ -55,9 +63,14 @@ class video_reader
 
  private:
   [[nodiscard]] std::span<AVStream*> get_media_streams() const noexcept;
+  [[nodiscard]] int64_t next_seek_request() noexcept;
+  [[nodiscard]] seek_result process_seek_request() noexcept;
+  void handle_seek_request(seek_direction direction) noexcept;
 
-  void picture_frame_handler(AVFrame* frame) noexcept;
-  void audio_frame_handler(AVFrame* audio_frame) noexcept;
+  void picture_frame_handler(AVFrame* frame,
+                             bool reset_frame_sequence) noexcept;
+  void audio_frame_handler(AVFrame* audio_frame,
+                           bool reset_frame_sequence) noexcept;
 
   void decode_video() noexcept;
 
@@ -67,6 +80,10 @@ class video_reader
 
   // Separate thread used for decoding frames
   std::thread frame_decoder_;
+
+  // Main thread will write seek request (in pts), decode thread will pull and
+  // call av_seek_frame
+  std::atomic<int64_t> seek_request_{-1};
 
   // Atomic flags used to synchronize with frame_decoder_ thread
   std::atomic<bool> is_paused_{false}, is_terminated_{false};
