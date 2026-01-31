@@ -19,11 +19,14 @@ extern "C" {
 
 namespace mvplayer {
 class video_reader
-    : public multithreaded::events::handlers<events::playback_toggled>,
+    : public multithreaded::events::handlers<events::playback_toggled,
+                                             events::seek_request>,
       public multithreaded::processor::termination_handler {
  private:
   using playback_toggled_event =
       multithreaded::events::envelope<events::playback_toggled>;
+  using seek_request_event =
+      multithreaded::events::envelope<events::seek_request>;
 
  public:
   ~video_reader() noexcept override;
@@ -47,6 +50,7 @@ class video_reader
     is_paused_.store(!is_paused_.load(std::memory_order_relaxed),
                      std::memory_order_release);
   }
+  void operator()(const seek_request_event& event) override;
   void on_startup(std::span<char* const> args) noexcept;
 
  private:

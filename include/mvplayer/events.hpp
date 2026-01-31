@@ -27,4 +27,8 @@ struct new_audio_samples_loaded {
   int64_t frame_pts;
   int64_t frame_pkt_dts;
 };
+
+struct seek_request {
+  seek_direction direction;
+};
 }  // namespace mvplayer::events

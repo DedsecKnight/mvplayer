@@ -36,4 +36,7 @@ struct frame_info {
   cv::Mat frame;
   int64_t frame_no, pts, dts;
 };
+
+enum class seek_direction : uint8_t { forward, backward };
+
 }  // namespace mvplayer

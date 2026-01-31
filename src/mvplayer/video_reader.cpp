@@ -1,7 +1,5 @@
 #include "video_reader.hpp"
 
-#include <libavutil/samplefmt.h>
-
 #include <atomic>
 #include <filesystem>
 
@@ -97,7 +95,8 @@ std::optional<video_info> video_reader::load_video(
     AVCodecParameters* codec_params_ptr = (*video_stream_it)->codecpar;
     const AVCodec* frame_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
-    frame_ctx_ = media_context{codec_params_ptr, frame_codec};
+    frame_ctx_ = media_context{format_context_ptr_, (*video_stream_it),
+                               codec_params_ptr, frame_codec};
 
     picture_info.format = frame_ctx_.codec().long_name;
     picture_info.fps = (*video_stream_it)->avg_frame_rate;
@@ -114,7 +113,8 @@ std::optional<video_info> video_reader::load_video(
     AVCodecParameters* codec_params_ptr = (*audio_stream_it)->codecpar;
     const AVCodec* audio_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
-    audio_ctx_ = audio_context{codec_params_ptr, audio_codec};
+    audio_ctx_ = audio_context{format_context_ptr_, (*audio_stream_it),
+                               codec_params_ptr, audio_codec};
     std::string_view audio_format_name{
         av_get_sample_fmt_name(audio_ctx_.codec_ctx().sample_fmt)};
     spdlog::info("Audio format name: {}", audio_format_name);
@@ -181,20 +181,39 @@ void video_reader::audio_frame_handler(
                                        .frame_pkt_dts = audio_frame->pkt_dts});
 }
 
+void video_reader::operator()(const seek_request_event& event) {
+  auto seek_direction = event.payload().direction;
+  audio_ctx_.handle_seek_request(seek_direction);
+  frame_ctx_.handle_seek_request(seek_direction);
+}
+
 void video_reader::decode_video() noexcept {
   av_packet packet{av_packet_alloc()};
   av_frame frame{av_frame_alloc()};
 
-  using frame_handler_t = void (video_reader::*)(AVFrame*);
-
   std::array<media_context*, 2> media_contexts{&frame_ctx_, &audio_ctx_};
-  std::array<frame_handler_t, 2> frame_handlers{
-      &video_reader::picture_frame_handler, &video_reader::audio_frame_handler};
+
+  // NOTE: use std::vector here for auto type deduction
+  std::vector frame_handlers{
+      std::bind_front(&video_reader::picture_frame_handler, this),
+      std::bind_front(&video_reader::audio_frame_handler, this)};
 
   const auto audio_stream_index = av_find_best_stream(
       format_context_ptr_, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
 
   while (!is_terminated_.load(std::memory_order_acquire)) {
+    if (is_paused_.load(std::memory_order_acquire)) {
+      continue;
+    }
+
+    if (!std::ranges::all_of(media_contexts, [](media_context* ctx) {
+          return ctx->process_seek_request();
+        })) {
+      spdlog::error("Error processing seek request");
+      std::ignore = request_termination();
+      return;
+    }
+
     if (is_paused_.load(std::memory_order_acquire) ||
         av_read_frame(format_context_ptr_, packet.get()) < 0) {
       continue;
@@ -216,7 +235,8 @@ void video_reader::decode_video() noexcept {
       if (ret == AVERROR(EAGAIN)) {
         break;
       }
-      std::bind_front(frame_handlers.at(context_index), this)(frame.get());
+      media_contexts.at(context_index)->update_most_recent_pts(frame->pts);
+      frame_handlers.at(context_index)(frame.get());
     }
   }
 }

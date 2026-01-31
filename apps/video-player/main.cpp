@@ -19,7 +19,8 @@ int main(int argc, char** argv) {
 
   frame_renderer.subscribe_to<mvplayer::events::new_frame_loaded,
                               mvplayer::events::new_video_loaded>(video_reader);
-  video_reader.subscribe_to<mvplayer::events::playback_toggled>(frame_renderer);
+  video_reader.subscribe_to<mvplayer::events::playback_toggled,
+                            mvplayer::events::seek_request>(frame_renderer);
 
   audio_renderer.subscribe_to<mvplayer::events::new_audio_samples_loaded,
                               mvplayer::events::new_video_loaded>(video_reader);

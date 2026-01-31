@@ -162,22 +162,40 @@ void frame_renderer::event_listener() noexcept {
         return;
       }
       if (sdl_event.type == SDL_EVENT_KEY_DOWN) {
-        if (sdl_event.key.scancode == SDL_SCANCODE_SPACE) {
-          const auto current_ts =
-              std::chrono::duration_cast<std::chrono::milliseconds>(
-                  std::chrono::high_resolution_clock::now().time_since_epoch())
-                  .count();
-          const auto paused_status = is_paused_.load(std::memory_order_relaxed);
-          if (!paused_status) {
-            stop_counter -= current_ts;
-          } else {
-            stop_counter += current_ts;
-            playback_state_.extra_time.fetch_add(stop_counter,
-                                                 std::memory_order_acq_rel);
-            stop_counter = 0;
+        switch (sdl_event.key.scancode) {
+          case SDL_SCANCODE_SPACE: {
+            const auto current_ts =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::high_resolution_clock::now()
+                        .time_since_epoch())
+                    .count();
+            const auto paused_status =
+                is_paused_.load(std::memory_order_relaxed);
+            if (!paused_status) {
+              stop_counter -= current_ts;
+            } else {
+              stop_counter += current_ts;
+              playback_state_.extra_time.fetch_add(stop_counter,
+                                                   std::memory_order_acq_rel);
+              stop_counter = 0;
+            }
+            is_paused_.store(!paused_status, std::memory_order_release);
+            broadcast(events::playback_toggled{});
+            break;
           }
-          is_paused_.store(!paused_status, std::memory_order_release);
-          broadcast(events::playback_toggled{});
+          case SDL_SCANCODE_LEFT: {
+            broadcast(
+                events::seek_request{.direction = seek_direction::backward});
+            break;
+          }
+          case SDL_SCANCODE_RIGHT: {
+            broadcast(
+                events::seek_request{.direction = seek_direction::forward});
+            break;
+          }
+          default: {
+            break;
+          }
         }
       }
     }
