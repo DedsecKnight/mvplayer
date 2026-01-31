@@ -185,8 +185,11 @@ void video_reader::decode_video() noexcept {
   av_packet packet{av_packet_alloc()};
   av_frame frame{av_frame_alloc()};
 
-  auto& frame_codec_ctx = frame_ctx_.codec_ctx();
-  auto& audio_codec_ctx = audio_ctx_.codec_ctx();
+  using frame_handler_t = void (video_reader::*)(AVFrame*);
+
+  std::array<media_context*, 2> media_contexts{&frame_ctx_, &audio_ctx_};
+  std::array<frame_handler_t, 2> frame_handlers{
+      &video_reader::picture_frame_handler, &video_reader::audio_frame_handler};
 
   const auto audio_stream_index = av_find_best_stream(
       format_context_ptr_, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
@@ -196,11 +199,12 @@ void video_reader::decode_video() noexcept {
         av_read_frame(format_context_ptr_, packet.get()) < 0) {
       continue;
     }
-    bool is_audio_packet = packet->stream_index == audio_stream_index;
-    auto* codec_ctx_ptr =
-        (is_audio_packet ? &audio_codec_ctx : &frame_codec_ctx);
 
-    auto ret = avcodec_send_packet(codec_ctx_ptr, packet.get());
+    const auto context_index =
+        static_cast<size_t>(packet->stream_index == audio_stream_index);
+    auto& codec_ctx = media_contexts.at(context_index)->codec_ctx();
+
+    auto ret = avcodec_send_packet(&codec_ctx, packet.get());
     while (ret >= 0) {
       if (is_terminated_.load(std::memory_order_acquire)) {
         return;
@@ -208,15 +212,11 @@ void video_reader::decode_video() noexcept {
       if (is_paused_.load(std::memory_order_acquire)) {
         continue;
       }
-      ret = avcodec_receive_frame(codec_ctx_ptr, frame.get());
+      ret = avcodec_receive_frame(&codec_ctx, frame.get());
       if (ret == AVERROR(EAGAIN)) {
         break;
       }
-      if (is_audio_packet) {
-        audio_frame_handler(frame.get());
-      } else {
-        picture_frame_handler(frame.get());
-      }
+      std::bind_front(frame_handlers.at(context_index), this)(frame.get());
     }
   }
 }
