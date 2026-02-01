@@ -72,7 +72,7 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   spdlog::trace("SDL Renderer created successfully");
 
   texture_ = sdl_manager::create_texture(
-      renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_RGB24,
+      renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_IYUV,
       SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, padded_width,
       padded_height);
   if (texture_ == nullptr) {
@@ -91,22 +91,18 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         event.payload().frame_num - playback_state_.expected_frame_no);
   }
 
-  SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
+  SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
   SDL_RenderClear(renderer_.get());
 
-  cv::Mat padded_frame;
-  cv::copyMakeBorder(event.payload().frame, padded_frame, padding_, padding_,
-                     padding_, padding_, cv::BORDER_CONSTANT);
-
-  void* pixels{nullptr};
-  int32_t pitch{};
-  if (!SDL_LockTexture(texture_.get(), nullptr, &pixels, &pitch)) {
-    spdlog::error("Error creating texture: {}", SDL_GetError());
+  const auto& yuv_data = event.payload().frame;
+  SDL_Rect render_roi{.x = padding_, .y = padding_, .w = width_, .h = height_};
+  if (!SDL_UpdateYUVTexture(texture_.get(), &render_roi,
+                            yuv_data.data[0].data(), yuv_data.linesize[0],
+                            yuv_data.data[1].data(), yuv_data.linesize[1],
+                            yuv_data.data[2].data(), yuv_data.linesize[2])) {
+    spdlog::error("Error updating texture: {}", SDL_GetError());
     std::ignore = event_handler_t::request_termination();
   }
-  std::memcpy(pixels, padded_frame.data,
-              event.payload().frame.elemSize() * event.payload().frame.total());
-  SDL_UnlockTexture(texture_.get());
 
   auto curr_frame_ts = SDL_GetTicks();
   spdlog::trace("Current frame timestamp: {}. PTS = {}. Timebase = {} / {}",
@@ -131,8 +127,9 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         av_rescale_q(pts_in_ms, playback_state_.timebase,
                      AVRational{.num = 1, .den = 1});
     if (expected_render_time < curr_frame_ts) {
-      spdlog::critical("Frame renderer is {}ms behind",
-                       curr_frame_ts - expected_render_time);
+      spdlog::critical("Frame renderer is {}ms behind for frame no {}",
+                       curr_frame_ts - expected_render_time,
+                       event.payload().frame_num);
     } else {
       auto wait_time = expected_render_time - curr_frame_ts;
       SDL_Delay(wait_time);

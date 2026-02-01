@@ -7,7 +7,6 @@
 #include "events.hpp"
 #include "info.hpp"
 #include "media_context.hpp"
-#include "utils/conversion.hpp"
 
 extern "C" {
 #include <libavcodec/codec.h>
@@ -205,17 +204,20 @@ void video_reader::handle_seek_request(seek_direction direction) noexcept {
 
 void video_reader::picture_frame_handler(AVFrame* picture_frame,
                                          bool reset_frame_sequence) noexcept {
-  auto converted_frame =
-      utils::convert_frame(picture_frame, AVPixelFormat::AV_PIX_FMT_RGB24);
-
-  cv::Mat frame_mat(converted_frame->height, converted_frame->width, CV_8UC3);
-  std::memcpy(frame_mat.data, converted_frame->data[0],
-              frame_mat.elemSize() * frame_mat.total());
+  yuv_frame frame;
+  for (size_t i = 0; i < yuv_frame::NUM_PLANES; ++i) {
+    // NOLINTBEGIN
+    frame.data.at(i).resize(picture_frame->linesize[i] * picture_frame->height);
+    std::memcpy(frame.data.at(i).data(), picture_frame->data[i],
+                frame.data.at(i).size());
+    frame.linesize[i] = picture_frame->linesize[i];
+    // NOLINTEND
+  }
   if (is_terminated_.load(std::memory_order_acquire)) {
     return;
   }
   event_handler_t::broadcast(
-      events::new_frame_loaded{.frame = frame_mat,
+      events::new_frame_loaded{.frame = frame,
                                .frame_num = frame_ctx_.codec_ctx().frame_num,
                                .frame_pts = picture_frame->pts,
                                .frame_pkt_dts = picture_frame->pkt_dts,
