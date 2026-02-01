@@ -60,6 +60,13 @@ video_reader& video_reader::operator=(video_reader&& reader) noexcept {
   return *this;
 }
 
+void video_reader::handle_termination_signal() noexcept {
+  is_terminated_.store(true, std::memory_order_release);
+  if (frame_decoder_.joinable()) {
+    frame_decoder_.join();
+  }
+}
+
 std::optional<video_info> video_reader::load_video(
     const std::filesystem::path& filename) noexcept {
   spdlog::info("Reading video file: {}", filename.filename().string());

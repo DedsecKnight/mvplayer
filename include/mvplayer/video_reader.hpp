@@ -47,9 +47,7 @@ class video_reader
   video_reader(video_reader&& reader) noexcept;
   video_reader& operator=(video_reader&& reader) noexcept;
 
-  void handle_termination_signal() noexcept override {
-    is_terminated_.store(true, std::memory_order_release);
-  }
+  void handle_termination_signal() noexcept override;
 
   [[nodiscard]] std::optional<video_info> load_video(
       const std::filesystem::path& filename) noexcept;
