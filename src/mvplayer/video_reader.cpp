@@ -199,6 +199,9 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame,
   cv::Mat frame_mat(converted_frame->height, converted_frame->width, CV_8UC3);
   std::memcpy(frame_mat.data, converted_frame->data[0],
               frame_mat.elemSize() * frame_mat.total());
+  if (is_terminated_.load(std::memory_order_acquire)) {
+    return;
+  }
   event_handler_t::broadcast(
       events::new_frame_loaded{.frame = frame_mat,
                                .frame_num = frame_ctx_.codec_ctx().frame_num,
@@ -225,7 +228,9 @@ void video_reader::audio_frame_handler(
     audio_buffer.resize(buffer_size);
     std::memcpy(audio_buffer.data(), audio_frame->data[0], audio_buffer.size());
   }
-
+  if (is_terminated_.load(std::memory_order_acquire)) {
+    return;
+  }
   event_handler_t::broadcast(
       events::new_audio_samples_loaded{.samples = std::move(audio_buffer),
                                        .frame_num = audio_codec_ctx.frame_num});
