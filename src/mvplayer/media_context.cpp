@@ -6,8 +6,6 @@
 #include <atomic>
 #include <stdexcept>
 
-#include "utils/owned.hpp"
-
 namespace mvplayer {
 media_context::media_context(AVFormatContext* format_ctx_ptr, AVStream* stream,
                              AVCodecParameters* codec_params_ptr,

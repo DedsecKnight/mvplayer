@@ -178,18 +178,23 @@ video_reader::process_seek_request() noexcept {
 }
 
 void video_reader::handle_seek_request(seek_direction direction) noexcept {
-  int32_t multiplier = (direction == seek_direction::backward ? -1 : 1);
   const auto timebase = frame_ctx_.stream().time_base;
-  const auto most_recent_pts_ts =
+
+  int32_t multiplier = (direction == seek_direction::backward ? -1 : 1);
+  const int64_t delta_pts = seek_unit_secs * multiplier * AV_TIME_BASE;
+
+  auto most_recent_pts_ts =
       av_rescale_q(frame_ctx_.most_recent_pts(), timebase,
                    AVRational{.num = 1, .den = AV_TIME_BASE});
-  int64_t curr_seek_pos = seek_request_.load(std::memory_order_acquire);
-  const int64_t delta_pts = seek_unit_secs * multiplier * AV_TIME_BASE;
+
+  int64_t curr_seek_pos = seek_request_.load(std::memory_order_relaxed);
   int64_t new_seek_pos = std::clamp(
       (curr_seek_pos == -1 ? most_recent_pts_ts : curr_seek_pos) + delta_pts,
       0L, format_context_ptr_->duration);
-  while (!seek_request_.compare_exchange_weak(curr_seek_pos, new_seek_pos)) {
-    const auto most_recent_pts_ts =
+
+  while (!seek_request_.compare_exchange_weak(curr_seek_pos, new_seek_pos,
+                                              std::memory_order_relaxed)) {
+    most_recent_pts_ts =
         av_rescale_q(frame_ctx_.most_recent_pts(), timebase,
                      AVRational{.num = 1, .den = AV_TIME_BASE});
     new_seek_pos = std::clamp(
@@ -299,10 +304,10 @@ void video_reader::decode_video() noexcept {
       if (ret == AVERROR(EAGAIN)) {
         break;
       }
-      media_contexts.at(context_index)->update_most_recent_pts(frame->pts);
       frame_handlers.at(context_index)(frame.get(),
                                        reset_frame_seq.at(context_index));
       reset_frame_seq.at(context_index) = false;
+      media_contexts.at(context_index)->update_most_recent_pts(frame->pts);
     }
   }
 }
