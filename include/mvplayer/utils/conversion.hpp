@@ -5,10 +5,10 @@
 #include <array>
 
 extern "C" {
+#include <libavutil/frame.h>
 #include <libavutil/samplefmt.h>
 }
 
-#include "utils/owned.hpp"
 namespace mvplayer::utils {
 
 static constexpr std::array<std::pair<AVSampleFormat, SDL_AudioFormat>, 12>
@@ -39,7 +39,7 @@ static constexpr std::array<std::pair<AVSampleFormat, SDL_AudioFormat>, 12>
                        SDL_AudioFormat::SDL_AUDIO_UNKNOWN),
 };
 
-av_frame convert_frame(AVFrame* src_frame, AVPixelFormat dst_format);
+AVFrame* convert_frame(AVFrame* src_frame, AVPixelFormat dst_format);
 SDL_AudioFormat to_sdl_format(AVSampleFormat ff_sample_format);
 
 }  // namespace mvplayer::utils

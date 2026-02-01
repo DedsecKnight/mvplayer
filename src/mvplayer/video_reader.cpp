@@ -7,11 +7,13 @@
 #include "events.hpp"
 #include "info.hpp"
 #include "media_context.hpp"
+#include "utils/conversion.hpp"
 
 extern "C" {
 #include <libavcodec/codec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 }
 
 #include <spdlog/spdlog.h>
@@ -204,24 +206,23 @@ void video_reader::handle_seek_request(seek_direction direction) noexcept {
 
 void video_reader::picture_frame_handler(AVFrame* picture_frame,
                                          bool reset_frame_sequence) noexcept {
-  yuv_frame frame;
-  for (size_t i = 0; i < yuv_frame::NUM_PLANES; ++i) {
-    // NOLINTBEGIN
-    frame.data.at(i).resize(picture_frame->linesize[i] * picture_frame->height);
-    std::memcpy(frame.data.at(i).data(), picture_frame->data[i],
-                frame.data.at(i).size());
-    frame.linesize[i] = picture_frame->linesize[i];
-    // NOLINTEND
+  bool requires_dealloc = false;
+  if (picture_frame->format != AVPixelFormat::AV_PIX_FMT_YUV420P) {
+    picture_frame = utils::convert_frame(picture_frame, AV_PIX_FMT_YUV420P);
+    requires_dealloc = true;
   }
-  if (is_terminated_.load(std::memory_order_acquire)) {
+  if (is_terminated_.load(std::memory_order_acquire)) [[unlikely]] {
     return;
   }
   event_handler_t::broadcast(
-      events::new_frame_loaded{.frame = frame,
+      events::new_frame_loaded{.frame = yuv_frame{picture_frame},
                                .frame_num = frame_ctx_.codec_ctx().frame_num,
                                .frame_pts = picture_frame->pts,
                                .frame_pkt_dts = picture_frame->pkt_dts,
                                .reset_frame_sequence = reset_frame_sequence});
+  if (requires_dealloc) {
+    av_frame_free(&picture_frame);
+  }
 }
 
 void video_reader::audio_frame_handler([[maybe_unused]] AVFrame* audio_frame,

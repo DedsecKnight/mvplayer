@@ -2,7 +2,7 @@
 
 #include <SDL3/SDL_audio.h>
 
-#include "utils/owned.hpp"
+#include <algorithm>
 
 extern "C" {
 #include <libavutil/imgutils.h>
@@ -12,22 +12,23 @@ extern "C" {
 
 namespace mvplayer::utils {
 
-av_frame convert_frame(AVFrame* src_frame, AVPixelFormat dst_format) {
-  av_frame dest_frame{av_frame_alloc()};
+AVFrame* convert_frame(AVFrame* src_frame, AVPixelFormat dst_format) {
+  AVFrame* dest_frame = av_frame_alloc();
   if (dest_frame == nullptr) {
-    return dest_frame;
+    return nullptr;
   }
 
   if (av_image_alloc(static_cast<uint8_t**>(dest_frame->data),
                      static_cast<int32_t*>(dest_frame->linesize),
                      src_frame->width, src_frame->height, dst_format, 1) < 0) {
-    dest_frame.reset(nullptr);
-    return dest_frame;
+    av_frame_free(&dest_frame);
+    return nullptr;
   }
 
   dest_frame->width = src_frame->width;
   dest_frame->height = src_frame->height;
   dest_frame->format = dst_format;
+  dest_frame->pts = src_frame->pts;
 
   SwsContext* conversion_context = sws_getContext(
       src_frame->width, src_frame->height,
