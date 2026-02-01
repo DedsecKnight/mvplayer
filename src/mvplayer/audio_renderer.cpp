@@ -28,8 +28,8 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
         event.payload().frame_num - playback_state_.expected_frame_no);
   }
 
-  if (playback_state_.expected_frame_no == 1) {
-    SDL_ResumeAudioStreamDevice(audio_stream_.get());
+  if (event.payload().reset_frame_sequence) {
+    SDL_ClearAudioStream(audio_stream_.get());
   }
 
   const auto& payload = event.payload();
@@ -59,6 +59,7 @@ void audio_renderer::operator()(const new_video_loaded_event& event) {
   }
 
   spdlog::trace("SDL Audio Stream created successfully");
+  SDL_ResumeAudioStreamDevice(audio_stream_.get());
 }
 
 void audio_renderer::operator()(

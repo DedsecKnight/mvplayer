@@ -24,6 +24,7 @@ struct new_video_loaded {
 struct new_audio_samples_loaded {
   std::vector<uint8_t> samples;
   int64_t frame_num;
+  bool reset_frame_sequence;
 };
 
 struct seek_request {
