@@ -28,9 +28,6 @@ class audio_renderer
       multithreaded::events::envelope<events::playback_toggled>;
 
   struct audio_playback_state {
-    AVRational timebase{};
-    uint64_t pause_toggled_ts{}, extra_time{}, first_frame_render_ts{},
-        first_frame_pts{};
     int64_t expected_frame_no{1};
   };
 

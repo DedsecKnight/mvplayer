@@ -28,39 +28,11 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
         event.payload().frame_num - playback_state_.expected_frame_no);
   }
 
-  auto curr_frame_ts = SDL_GetTicks();
-  spdlog::trace("Current frame timestamp: {}. PTS = {}. Timebase = {} / {}",
-                curr_frame_ts, event.payload().frame_pts,
-                playback_state_.timebase.num, playback_state_.timebase.den);
-
   if (playback_state_.expected_frame_no == 1) {
-    playback_state_.first_frame_render_ts = curr_frame_ts;
-    playback_state_.first_frame_pts = event.payload().frame_pts;
     SDL_ResumeAudioStreamDevice(audio_stream_.get());
-  } else if (event.payload().reset_frame_sequence) {
-    playback_state_.first_frame_render_ts = curr_frame_ts;
-    playback_state_.first_frame_pts = event.payload().frame_pts;
-    playback_state_.extra_time = 0;
-  } else {
-    auto pts_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         std::chrono::seconds(event.payload().frame_pts))
-                         .count();
-    auto expected_render_time =
-        playback_state_.first_frame_render_ts + playback_state_.extra_time +
-        static_cast<uint64_t>(std::ceil(
-            static_cast<double>(pts_in_ms * playback_state_.timebase.num) /
-            playback_state_.timebase.den));
-    if (expected_render_time < curr_frame_ts) {
-      spdlog::critical("Frame renderer is {}ms behind",
-                       curr_frame_ts - expected_render_time);
-    } else {
-      auto wait_time = expected_render_time - curr_frame_ts;
-      SDL_Delay(wait_time);
-      spdlog::trace("Slept for {}ms", wait_time);
-    }
   }
-  const auto& payload = event.payload();
 
+  const auto& payload = event.payload();
   if (!SDL_PutAudioStreamData(audio_stream_.get(), payload.samples.data(),
                               static_cast<int32_t>(payload.samples.size()))) {
     spdlog::error("Error enqueueing audio sample: {}", SDL_GetError());
@@ -86,24 +58,15 @@ void audio_renderer::operator()(const new_video_loaded_event& event) {
         std::format("Error creating audio stream: {}", SDL_GetError())};
   }
 
-  playback_state_.first_frame_render_ts = 0;
-  playback_state_.timebase = event.payload().info.audio.tbn;
-
   spdlog::trace("SDL Audio Stream created successfully");
 }
 
 void audio_renderer::operator()(
     [[maybe_unused]] const playback_toggled_event& event) {
-  const auto current_ts =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::high_resolution_clock::now().time_since_epoch())
-          .count();
   if (!is_paused_) {
     SDL_FlushAudioStream(audio_stream_.get());
-    playback_state_.pause_toggled_ts = current_ts;
     SDL_PauseAudioStreamDevice(audio_stream_.get());
   } else {
-    playback_state_.extra_time += current_ts - playback_state_.pause_toggled_ts;
     SDL_ResumeAudioStreamDevice(audio_stream_.get());
   }
   is_paused_ = !is_paused_;

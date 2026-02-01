@@ -207,8 +207,9 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame,
                                .reset_frame_sequence = reset_frame_sequence});
 }
 
-void video_reader::audio_frame_handler([[maybe_unused]] AVFrame* audio_frame,
-                                       bool reset_frame_sequence) noexcept {
+void video_reader::audio_frame_handler(
+    [[maybe_unused]] AVFrame* audio_frame,
+    [[maybe_unused]] bool reset_frame_sequence) noexcept {
   auto& audio_codec_ctx = audio_ctx_.codec_ctx();
 
   std::vector<uint8_t> audio_buffer;
@@ -225,12 +226,9 @@ void video_reader::audio_frame_handler([[maybe_unused]] AVFrame* audio_frame,
     std::memcpy(audio_buffer.data(), audio_frame->data[0], audio_buffer.size());
   }
 
-  event_handler_t::broadcast(events::new_audio_samples_loaded{
-      .samples = std::move(audio_buffer),
-      .frame_num = audio_codec_ctx.frame_num,
-      .frame_pts = audio_frame->pts,
-      .frame_pkt_dts = audio_frame->pkt_dts,
-      .reset_frame_sequence = reset_frame_sequence});
+  event_handler_t::broadcast(
+      events::new_audio_samples_loaded{.samples = std::move(audio_buffer),
+                                       .frame_num = audio_codec_ctx.frame_num});
 }
 
 void video_reader::operator()(const seek_request_event& event) {
