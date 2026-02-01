@@ -11,7 +11,7 @@
 namespace multithreaded::utils {
 
 namespace queue_details {
-static constexpr size_t DEFAULT_QUEUE_SIZE = 31;
+static constexpr size_t DEFAULT_QUEUE_SIZE = 7;
 static constexpr int32_t DEFAULT_WAIT_TIME_MS = 512;
 }  // namespace queue_details
 
