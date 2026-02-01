@@ -104,6 +104,8 @@ class frame_renderer
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
   video_playback_state playback_state_;
+  SDL_Rect frame_roi_{};
+  SDL_FRect render_roi_{};
   int32_t width_{}, height_{}, padding_{};
   std::atomic<bool> is_terminated_{false}, is_paused_{false};
 };

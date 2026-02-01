@@ -69,12 +69,16 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
     throw std::runtime_error{
         std::format("Error creating renderer: {}", SDL_GetError())};
   }
+  render_roi_ = {.x = static_cast<float>(padding_),
+                 .y = static_cast<float>(padding_),
+                 .w = static_cast<float>(width_),
+                 .h = static_cast<float>(height_)};
+  frame_roi_ = {.x = 0, .y = 0, .w = width_, .h = height_};
   spdlog::trace("SDL Renderer created successfully");
 
   texture_ = sdl_manager::create_texture(
       renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_IYUV,
-      SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, padded_width,
-      padded_height);
+      SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, width_, height_);
   if (texture_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating texture: {}", SDL_GetError())};
@@ -91,12 +95,11 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         event.payload().frame_num - playback_state_.expected_frame_no);
   }
 
-  SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
+  SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
 
   const auto& yuv_data = event.payload().frame;
-  SDL_Rect render_roi{.x = padding_, .y = padding_, .w = width_, .h = height_};
-  if (!SDL_UpdateYUVTexture(texture_.get(), &render_roi,
+  if (!SDL_UpdateYUVTexture(texture_.get(), &frame_roi_,
                             yuv_data.data[0].data(), yuv_data.linesize[0],
                             yuv_data.data[1].data(), yuv_data.linesize[1],
                             yuv_data.data[2].data(), yuv_data.linesize[2])) {
@@ -137,7 +140,8 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     }
   }
 
-  if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr, nullptr) ||
+  if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr,
+                         &render_roi_) ||
       !SDL_RenderPresent(renderer_.get())) {
     spdlog::error("Error rendering frame: {}", SDL_GetError());
     std::ignore = event_handler_t::request_termination();
