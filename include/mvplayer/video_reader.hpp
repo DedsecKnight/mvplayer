@@ -63,7 +63,6 @@ class video_reader
   [[nodiscard]] std::span<AVStream*> get_media_streams() const noexcept;
   [[nodiscard]] int64_t next_seek_request() noexcept;
   [[nodiscard]] seek_result process_seek_request() noexcept;
-  void handle_seek_request(seek_direction direction) noexcept;
 
   void picture_frame_handler(AVFrame* frame,
                              bool reset_frame_sequence) noexcept;

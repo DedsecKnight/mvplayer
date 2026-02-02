@@ -13,7 +13,7 @@ class VideoPlayerRecipe(ConanFile):
         self.requires("cli11/2.6.0")
         self.requires("spdlog/1.16.0")
         self.requires("opencv/4.12.0")
-        self.requires("sdl/3.2.20")
+        self.requires("sdl/3.4.0")
         self.requires("gtest/1.17.0")
 
     def configure(self):
