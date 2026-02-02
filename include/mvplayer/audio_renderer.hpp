@@ -4,7 +4,6 @@
 #include <SDL3/SDL_audio.h>
 
 #include <cstdint>
-#include <opencv2/core.hpp>
 
 #include "events.hpp"
 #include "events/envelope.hpp"

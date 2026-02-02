@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <opencv2/core.hpp>
 #include <string_view>
 
 extern "C" {
@@ -30,11 +29,6 @@ struct video_info {
   std::string_view codec_name;
   picture_info picture;
   audio_info audio;
-};
-
-struct frame_info {
-  cv::Mat frame;
-  int64_t frame_no, pts, dts;
 };
 
 enum class seek_direction : uint8_t { forward, backward };

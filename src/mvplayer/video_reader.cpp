@@ -18,8 +18,6 @@ extern "C" {
 
 #include <spdlog/spdlog.h>
 
-#include <opencv2/imgproc.hpp>
-
 namespace mvplayer {
 void video_reader::on_startup(std::span<char* const> args) noexcept {
   CLI::App app;

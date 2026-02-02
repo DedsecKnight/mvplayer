@@ -10,7 +10,6 @@ include(${CMAKE_BINARY_DIR}/generators/conan_toolchain.cmake)
 
 find_package(ffmpeg REQUIRED)
 find_package(spdlog REQUIRED)
-find_package(OpenCV REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(CLI11 REQUIRED)
 
@@ -64,7 +63,7 @@ target_sources(
 )
 
 target_link_libraries(multithreaded PUBLIC spdlog::spdlog)
-target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog opencv::opencv SDL3::SDL3 multithreaded CLI11::CLI11)
+target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog SDL3::SDL3 multithreaded CLI11::CLI11)
 
 add_subdirectory(apps)
 add_subdirectory(tests)

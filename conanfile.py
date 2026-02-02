@@ -12,7 +12,6 @@ class VideoPlayerRecipe(ConanFile):
         self.requires("ffmpeg/8.0.1")
         self.requires("cli11/2.6.0")
         self.requires("spdlog/1.16.0")
-        self.requires("opencv/4.12.0")
         self.requires("sdl/3.4.0")
         self.requires("gtest/1.17.0")
 
@@ -27,18 +26,6 @@ class VideoPlayerRecipe(ConanFile):
         self.options["ffmpeg"].with_xlib = False
 
         self.options["sdl"].shared = True
-
-        self.options["opencv"].ml = False
-        self.options["opencv"].dnn = False
-        self.options["opencv"].stitching = False
-        self.options["opencv"].dnn = False
-        self.options["opencv"].calib3d = False
-        self.options["opencv"].highgui = False
-        self.options["opencv"].videoio = False
-        self.options["opencv"].objdetect = False
-        self.options["opencv"].features2d = False
-        self.options["opencv"].with_ffmpeg = False
-        self.options["opencv"].with_quirc = False
 
     def generate(self):
         tc = CMakeToolchain(self, generator="Ninja")

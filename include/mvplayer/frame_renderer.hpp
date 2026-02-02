@@ -4,7 +4,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <opencv2/core.hpp>
 
 #include "events.hpp"
 #include "events/envelope.hpp"
