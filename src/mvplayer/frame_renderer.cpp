@@ -93,6 +93,7 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
         "[frame-renderer] Expected frame no {}, {} found. Lost {} frames",
         playback_state_.expected_frame_no, event.payload().frame_num,
         event.payload().frame_num - playback_state_.expected_frame_no);
+    playback_state_.expected_frame_no = event.payload().frame_num;
   }
 
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);

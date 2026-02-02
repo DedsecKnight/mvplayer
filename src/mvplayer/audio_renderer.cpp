@@ -26,6 +26,7 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
         "[audio-renderer] Expected frame no {}, {} found. Lost {} frames",
         playback_state_.expected_frame_no, event.payload().frame_num,
         event.payload().frame_num - playback_state_.expected_frame_no);
+    playback_state_.expected_frame_no = event.payload().frame_num;
   }
 
   if (event.payload().reset_frame_sequence) {
