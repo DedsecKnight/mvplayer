@@ -13,7 +13,6 @@ struct new_frame_loaded {
   AVFrame* frame;
   int64_t frame_num;
   int64_t frame_pts;
-  int64_t frame_pkt_dts;
   bool reset_frame_sequence;
 };
 

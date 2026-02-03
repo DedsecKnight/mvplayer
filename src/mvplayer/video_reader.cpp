@@ -185,7 +185,6 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame,
       events::new_frame_loaded{.frame = av_frame_clone(picture_frame),
                                .frame_num = frame_ctx_.codec_ctx().frame_num,
                                .frame_pts = picture_frame->pts,
-                               .frame_pkt_dts = picture_frame->pkt_dts,
                                .reset_frame_sequence = reset_frame_sequence});
 }
 
