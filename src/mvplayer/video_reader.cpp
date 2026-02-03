@@ -266,6 +266,7 @@ void video_reader::decode_video() noexcept {
     auto& codec_ctx = media_contexts.at(context_index)->codec_ctx();
 
     auto ret = avcodec_send_packet(&codec_ctx, packet.get());
+    av_packet_unref(packet.get());
     while (ret >= 0) {
       if (is_terminated_.load(std::memory_order_acquire)) {
         return;
@@ -281,6 +282,7 @@ void video_reader::decode_video() noexcept {
                                        reset_frame_seq.at(context_index));
       reset_frame_seq.at(context_index) = false;
       media_contexts.at(context_index)->update_most_recent_pts(frame->pts);
+      av_frame_unref(frame.get());
     }
   }
 }
