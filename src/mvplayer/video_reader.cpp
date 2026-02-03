@@ -189,7 +189,7 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame,
                                .reset_frame_sequence = reset_frame_sequence});
 }
 
-void video_reader::audio_frame_handler([[maybe_unused]] AVFrame* audio_frame,
+void video_reader::audio_frame_handler(AVFrame* audio_frame,
                                        bool reset_frame_sequence) noexcept {
   auto& audio_codec_ctx = audio_ctx_.codec_ctx();
   if (is_terminated_.load(std::memory_order_acquire)) {
