@@ -1,6 +1,9 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+extern "C" {
+#include <libswscale/swscale.h>
+}
 
 #include <atomic>
 #include <cstdint>
@@ -25,6 +28,8 @@ class frame_renderer
       multithreaded::events::envelope<events::new_frame_loaded>;
   using new_video_loaded_event =
       multithreaded::events::envelope<events::new_video_loaded>;
+  static constexpr AVPixelFormat SUPPORTED_FORMAT =
+      AVPixelFormat::AV_PIX_FMT_YUV420P;
 
   struct video_playback_state {
     video_playback_state() = default;
@@ -97,6 +102,8 @@ class frame_renderer
 
  private:
   void event_listener() noexcept;
+  bool convert_frame(AVFrame* frame) noexcept;
+  bool initialize_converted_frame_holder(AVFrame* frame) noexcept;
 
   std::thread event_listener_;
   sdl_window window_{nullptr};
@@ -105,6 +112,8 @@ class frame_renderer
   video_playback_state playback_state_;
   SDL_Rect frame_roi_{};
   SDL_FRect render_roi_{};
+  SwsContext* conversion_context_{nullptr};
+  AVFrame* converted_frame_holder_{nullptr};
   int32_t width_{}, height_{}, padding_{};
   std::atomic<bool> is_terminated_{false}, is_paused_{false};
 };

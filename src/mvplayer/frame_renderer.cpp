@@ -5,6 +5,12 @@
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_timer.h>
+#include <libavutil/frame.h>
+extern "C" {
+#include <libavutil/imgutils.h>
+#include <libavutil/pixfmt.h>
+#include <libswscale/swscale.h>
+}
 #include <spdlog/spdlog.h>
 
 #include <atomic>
@@ -81,8 +87,61 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
     throw std::runtime_error{
         std::format("Error creating texture: {}", SDL_GetError())};
   }
+
+  if (converted_frame_holder_ != nullptr) {
+    av_frame_free(&converted_frame_holder_);
+  }
+  if (conversion_context_ != nullptr) {
+    sws_free_context(&conversion_context_);
+  }
+
   spdlog::trace("SDL Texture created successfully");
   event_listener_ = std::thread{&frame_renderer::event_listener, this};
+}
+
+bool frame_renderer::initialize_converted_frame_holder(
+    AVFrame* frame) noexcept {
+  converted_frame_holder_ = av_frame_alloc();
+  if (converted_frame_holder_ == nullptr) {
+    return false;
+  }
+  if (av_image_alloc(static_cast<uint8_t**>(converted_frame_holder_->data),
+                     static_cast<int32_t*>(converted_frame_holder_->linesize),
+                     frame->width, frame->height, SUPPORTED_FORMAT, 1) < 0) {
+    av_frame_free(&converted_frame_holder_);
+    return false;
+  }
+  converted_frame_holder_->width = frame->width;
+  converted_frame_holder_->height = frame->height;
+  converted_frame_holder_->format = SUPPORTED_FORMAT;
+
+  return true;
+}
+
+bool frame_renderer::convert_frame(AVFrame* frame) noexcept {
+  const AVPixelFormat supported_format = AVPixelFormat::AV_PIX_FMT_YUV420P;
+  if (converted_frame_holder_ == nullptr &&
+      !initialize_converted_frame_holder(frame)) {
+    return false;
+  }
+
+  converted_frame_holder_->pts = frame->pts;
+
+  if (conversion_context_ == nullptr) {
+    conversion_context_ = sws_getContext(
+        frame->width, frame->height, static_cast<AVPixelFormat>(frame->format),
+        converted_frame_holder_->width, converted_frame_holder_->height,
+        supported_format,
+        SWS_FAST_BILINEAR | SWS_FULL_CHR_H_INT | SWS_ACCURATE_RND,  // NOLINT
+        nullptr, nullptr, nullptr);
+  }
+
+  sws_scale(conversion_context_, static_cast<uint8_t**>(frame->data),
+            static_cast<int32_t*>(frame->linesize), 0, frame->height,
+            static_cast<uint8_t**>(converted_frame_holder_->data),
+            static_cast<int32_t*>(converted_frame_holder_->linesize));
+
+  return true;
 }
 
 void frame_renderer::operator()(const new_frame_loaded_event& event) {
@@ -97,14 +156,27 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
 
-  const auto& yuv_data = event.payload().frame;
-  if (!SDL_UpdateYUVTexture(texture_.get(), &frame_roi_,
-                            yuv_data.data[0].data(), yuv_data.linesize[0],
-                            yuv_data.data[1].data(), yuv_data.linesize[1],
-                            yuv_data.data[2].data(), yuv_data.linesize[2])) {
+  auto* frame = event.payload().frame;
+  bool swap_frame = false;
+  if (frame->format != AVPixelFormat::AV_PIX_FMT_YUV420P) {
+    if (!convert_frame(frame)) {
+      spdlog::error("Error converting frame to YUV420P");
+      std::ignore = request_termination();
+    }
+    std::swap(frame, converted_frame_holder_);
+    swap_frame = true;
+  }
+  if (!SDL_UpdateYUVTexture(texture_.get(), &frame_roi_, frame->data[0],
+                            frame->linesize[0], frame->data[1],
+                            frame->linesize[1], frame->data[2],
+                            frame->linesize[2])) {
     spdlog::error("Error updating texture: {}", SDL_GetError());
     std::ignore = event_handler_t::request_termination();
   }
+  if (swap_frame) {
+    std::swap(frame, converted_frame_holder_);
+  }
+  av_frame_free(&frame);
 
   auto curr_frame_ts = SDL_GetTicks();
   spdlog::trace("Current frame timestamp: {}. PTS = {}. Timebase = {} / {}",
@@ -150,6 +222,12 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
 }
 
 frame_renderer::~frame_renderer() noexcept {
+  if (converted_frame_holder_ != nullptr) {
+    av_frame_free(&converted_frame_holder_);
+  }
+  if (conversion_context_ != nullptr) {
+    sws_freeContext(conversion_context_);
+  }
   if (event_listener_.joinable()) {
     event_listener_.join();
   }

@@ -1,16 +1,18 @@
 #pragma once
 
+#include <vector>
+
 #include "info.hpp"
-#include "utils/yuv_frame.hpp"
 
 extern "C" {
+#include <libavutil/frame.h>
 #include <libavutil/rational.h>
 }
 namespace mvplayer::events {
 struct playback_toggled {};
 
 struct new_frame_loaded {
-  yuv_frame frame;
+  AVFrame* frame;
   int64_t frame_num;
   int64_t frame_pts;
   int64_t frame_pkt_dts;

@@ -39,7 +39,6 @@ static constexpr std::array<std::pair<AVSampleFormat, SDL_AudioFormat>, 12>
                        SDL_AudioFormat::SDL_AUDIO_UNKNOWN),
 };
 
-AVFrame* convert_frame(AVFrame* src_frame, AVPixelFormat dst_format);
 SDL_AudioFormat to_sdl_format(AVSampleFormat ff_sample_format);
 
 }  // namespace mvplayer::utils
