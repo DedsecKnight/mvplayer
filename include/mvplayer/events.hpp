@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #include "info.hpp"
 
 extern "C" {
@@ -24,8 +22,9 @@ struct new_video_loaded {
 };
 
 struct new_audio_samples_loaded {
-  std::vector<uint8_t> samples;
+  AVFrame* frame;
   int64_t frame_num;
+  int32_t num_channels;
   bool reset_frame_sequence;
 };
 

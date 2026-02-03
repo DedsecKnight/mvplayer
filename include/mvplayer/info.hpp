@@ -5,6 +5,7 @@
 
 extern "C" {
 #include <libavutil/avutil.h>
+#include <libavutil/channel_layout.h>
 #include <libavutil/samplefmt.h>
 }
 
@@ -20,6 +21,7 @@ struct picture_info : public media_info {
 };
 
 struct audio_info : public media_info {
+  AVChannelLayout* channel_layout;
   AVSampleFormat sample_format;
   int32_t num_channels, frequency;
   bool has_audio_stream;

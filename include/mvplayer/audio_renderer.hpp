@@ -3,6 +3,12 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_audio.h>
 
+extern "C" {
+#include <libavutil/channel_layout.h>
+#include <libavutil/samplefmt.h>
+#include <libswresample/swresample.h>
+}
+
 #include <cstdint>
 
 #include "events.hpp"
@@ -49,11 +55,24 @@ class audio_renderer
   void operator()(const new_video_loaded_event& event) override;
   void operator()(const playback_toggled_event& event) override;
 
-  ~audio_renderer() noexcept override = default;
+  ~audio_renderer() noexcept override;
 
  private:
+  std::vector<uint8_t> generate_audio_buffer(AVFrame* frame,
+                                             int num_channels) noexcept;
+  std::vector<uint8_t> generate_packed_planar_sample(
+      AVFrame* frame, int32_t num_channels) noexcept;
+  std::vector<uint8_t> generate_non_planar_sample(
+      AVFrame* frame, int32_t num_channels) noexcept;
+
+  [[nodiscard]] bool initialize_swr_context(AVSampleFormat input_fmt,
+                                            AVSampleFormat output_fmt) noexcept;
+
+  AVChannelLayout* channel_layout_ptr_{nullptr};
   audio_playback_state playback_state_{};
   sdl_audio_stream audio_stream_{nullptr};
+  SwrContext* resample_context_{nullptr};
+  int32_t audio_sample_rate_{};
   bool is_paused_{false};
 };
 }  // namespace mvplayer

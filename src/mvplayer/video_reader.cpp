@@ -129,6 +129,7 @@ std::optional<video_info> video_reader::load_video(
     audio_info.sample_format = audio_ctx_.codec_ctx().sample_fmt;
     audio_info.num_channels = audio_ctx_.codec_ctx().ch_layout.nb_channels;
     audio_info.frequency = audio_ctx_.codec_ctx().sample_rate;
+    audio_info.channel_layout = &audio_ctx_.codec_ctx().ch_layout;
     audio_info.has_audio_stream = true;
   }
 
@@ -191,26 +192,13 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame,
 void video_reader::audio_frame_handler([[maybe_unused]] AVFrame* audio_frame,
                                        bool reset_frame_sequence) noexcept {
   auto& audio_codec_ctx = audio_ctx_.codec_ctx();
-
-  std::vector<uint8_t> audio_buffer;
-  if (av_sample_fmt_is_planar(
-          static_cast<AVSampleFormat>(audio_frame->format)) == 1) {
-    audio_buffer = audio_ctx_.pack_planar_audio_sample(audio_frame);
-  } else {
-    const auto num_samples = audio_frame->nb_samples;
-    const auto sample_size = static_cast<size_t>(
-        av_get_bytes_per_sample(audio_codec_ctx.sample_fmt));
-    const auto buffer_size =
-        sample_size * num_samples * audio_codec_ctx.ch_layout.nb_channels;
-    audio_buffer.resize(buffer_size);
-    std::memcpy(audio_buffer.data(), audio_frame->data[0], audio_buffer.size());
-  }
   if (is_terminated_.load(std::memory_order_acquire)) {
     return;
   }
   event_handler_t::broadcast(events::new_audio_samples_loaded{
-      .samples = std::move(audio_buffer),
+      .frame = av_frame_clone(audio_frame),
       .frame_num = audio_codec_ctx.frame_num,
+      .num_channels = audio_codec_ctx.ch_layout.nb_channels,
       .reset_frame_sequence = reset_frame_sequence});
 }
 
