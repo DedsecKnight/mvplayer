@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 
 extern "C" {
+#include <libavutil/frame.h>
 #include <libavutil/opt.h>
 #include <libavutil/samplefmt.h>
 }
@@ -138,9 +139,10 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
     SDL_ClearAudioStream(audio_stream_.get());
   }
 
-  const auto& payload = event.payload();
+  auto* frame = event.payload().frame;
   const auto audio_buffer =
-      generate_audio_buffer(payload.frame, payload.num_channels);
+      generate_audio_buffer(frame, event.payload().num_channels);
+  av_frame_free(&frame);
 
   if (!SDL_PutAudioStreamData(audio_stream_.get(), audio_buffer.data(),
                               static_cast<int32_t>(audio_buffer.size()))) {
