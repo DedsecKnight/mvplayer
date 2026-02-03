@@ -5,7 +5,6 @@
 #include <optional>
 #include <span>
 
-#include "audio_context.hpp"
 #include "events.hpp"
 #include "events/handler.hpp"
 #include "info.hpp"
@@ -72,8 +71,7 @@ class video_reader
   void decode_video() noexcept;
 
   AVFormatContext* format_context_ptr_{nullptr};
-  media_context frame_ctx_;
-  audio_context audio_ctx_;
+  media_context frame_ctx_, audio_ctx_;
 
   // Separate thread used for decoding frames
   std::thread frame_decoder_;

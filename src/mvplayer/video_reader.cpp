@@ -7,6 +7,7 @@
 #include "events.hpp"
 #include "info.hpp"
 #include "media_context.hpp"
+#include "utils/owned.hpp"
 
 extern "C" {
 #include <libavcodec/codec.h>
@@ -118,7 +119,7 @@ std::optional<video_info> video_reader::load_video(
     AVCodecParameters* codec_params_ptr = (*audio_stream_it)->codecpar;
     const AVCodec* audio_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
-    audio_ctx_ = audio_context{format_context_ptr_, (*audio_stream_it),
+    audio_ctx_ = media_context{format_context_ptr_, (*audio_stream_it),
                                codec_params_ptr, audio_codec};
     std::string_view audio_format_name{
         av_get_sample_fmt_name(audio_ctx_.codec_ctx().sample_fmt)};
