@@ -292,8 +292,7 @@ video_reader::~video_reader() noexcept {
     frame_decoder_.join();
   }
   if (format_context_ptr_ != nullptr) {
-    avformat_free_context(format_context_ptr_);
-    format_context_ptr_ = nullptr;
+    avformat_close_input(&format_context_ptr_);
   }
 }
 }  // namespace mvplayer
