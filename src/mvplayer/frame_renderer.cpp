@@ -145,7 +145,8 @@ bool frame_renderer::convert_frame(AVFrame* frame) noexcept {
 }
 
 void frame_renderer::operator()(const new_frame_loaded_event& event) {
-  if (event.payload().frame_num != playback_state_.expected_frame_no) {
+  const auto& payload = event.payload();
+  if (payload.frame_num != playback_state_.expected_frame_no) [[unlikely]] {
     spdlog::critical(
         "[frame-renderer] Expected frame no {}, {} found. Lost {} frames",
         playback_state_.expected_frame_no, event.payload().frame_num,
@@ -156,7 +157,7 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
   SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
   SDL_RenderClear(renderer_.get());
 
-  auto* frame = event.payload().frame;
+  auto* frame = payload.frame;
   bool swap_frame = false;
   if (frame->format != AVPixelFormat::AV_PIX_FMT_YUV420P) {
     if (!convert_frame(frame)) {
@@ -176,19 +177,17 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
   if (swap_frame) {
     std::swap(frame, converted_frame_holder_);
   }
-  av_frame_free(&frame);
 
   auto curr_frame_ts = SDL_GetTicks();
   spdlog::trace("Current frame timestamp: {}. PTS = {}. Timebase = {} / {}",
-                curr_frame_ts, event.payload().frame_pts,
-                playback_state_.timebase.num, playback_state_.timebase.den);
+                curr_frame_ts, payload.frame_pts, playback_state_.timebase.num,
+                playback_state_.timebase.den);
 
-  if (playback_state_.expected_frame_no == 1 ||
-      event.payload().reset_frame_sequence) {
+  if (playback_state_.expected_frame_no == 1 || payload.reset_frame_sequence) {
     // If no frames are rendered yet, use curr_frame_ts as base timestamp for
     // future renders
     playback_state_.first_frame_render_ts = curr_frame_ts;
-    playback_state_.first_frame_pts = event.payload().frame_pts;
+    playback_state_.first_frame_pts = payload.frame_pts;
     playback_state_.extra_time.store(0, std::memory_order_release);
   } else {
     auto pts_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -219,6 +218,7 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
   }
 
   playback_state_.expected_frame_no++;
+  av_frame_free(&frame);
 }
 
 frame_renderer::~frame_renderer() noexcept {
