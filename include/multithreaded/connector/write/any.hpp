@@ -1,23 +1,43 @@
 
 #pragma once
 
+#include <unordered_set>
+
 #include "connector/write/event_port.hpp"
 #include "port.hpp"
 
 namespace multithreaded::write {
 class any {
  private:
-  struct container {  // NOLINT
+  class container {  // NOLINT
+   public:
     virtual ~container() = default;
 
     template <typename event_t>
-    [[nodiscard]] bool send_event(const event_t& event) noexcept {
-      auto event_port_ptr = dynamic_cast<event_port<event_t>*>(this);
-      if (!event_port_ptr) {
+    [[nodiscard]] constexpr bool send_event(const event_t& event) noexcept {
+      std::string_view type_id{typeid(event_t).name()};
+      if (invalid_types_.contains(type_id)) {
         return false;
+      }
+      bool port_cached = casted_port_mapper_.contains(type_id);
+      auto event_port_ptr = port_cached
+                                ? casted_port_mapper_[type_id]
+                                      ->as_event_port_of<event_port<event_t>>()
+                                : dynamic_cast<event_port<event_t>*>(this);
+      if (!event_port_ptr) {
+        invalid_types_.insert(type_id);
+        return false;
+      }
+      if (!port_cached) {
+        casted_port_mapper_.emplace(type_id, event_port_ptr);
       }
       return event_port_ptr->send_event(event);
     }
+
+   private:
+    std::unordered_map<std::string_view, event_port_wrapper*>
+        casted_port_mapper_;
+    std::unordered_set<std::string_view> invalid_types_;
   };
 
   template <typename... event_ts>

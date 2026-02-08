@@ -1,6 +1,7 @@
 #pragma once
 
 #include <queue>
+#include <unordered_set>
 #include <variant>
 
 #include "connector/read/event_port.hpp"
@@ -9,28 +10,47 @@
 namespace multithreaded::read {
 class any {
  private:
-  struct container {  // NOLINT
+  class container {  // NOLINT
+   public:
     virtual ~container() = default;
 
     template <typename... processor_event_ts>
-    [[nodiscard]] bool get_event(
+    [[nodiscard]] constexpr bool get_event(
         std::variant<processor_event_ts...>& event_holder) noexcept {
-      auto event_fetcher = [this, &event_holder](auto&& event) -> bool {
-        using processor_event_t = std::decay_t<decltype(event)>;
-        auto event_port_ptr =
-            dynamic_cast<event_port<processor_event_t>*>(this);
-        if (!event_port_ptr) {
-          return false;
-        }
-        if (!event_port_ptr->get_event(event)) {
-          return false;
-        }
-        event_holder = event;
-        return true;
-      };
-
-      return (event_fetcher(processor_event_ts{}) || ...);
+      return (event_fetcher(event_holder, processor_event_ts{}) || ...);
     }
+
+   private:
+    template <typename event_t, typename... processor_event_ts>
+    bool event_fetcher(std::variant<processor_event_ts...>& event_holder,
+                       event_t event) {
+      using processor_event_t = std::decay_t<event_t>;
+      std::string_view type_id{typeid(processor_event_t).name()};
+      if (invalid_types_.contains(type_id)) {
+        return false;
+      }
+      bool port_cached = casted_port_mapper_.contains(type_id);
+      auto event_port_ptr =
+          port_cached ? casted_port_mapper_[type_id]
+                            ->as_event_port_of<event_port<processor_event_t>>()
+                      : dynamic_cast<event_port<processor_event_t>*>(this);
+      if (!event_port_ptr) {
+        invalid_types_.insert(type_id);
+        return false;
+      }
+      if (!port_cached) {
+        casted_port_mapper_.emplace(type_id, event_port_ptr);
+      }
+      if (!event_port_ptr->get_event(event)) {
+        return false;
+      }
+      event_holder = event;
+      return true;
+    }
+
+    std::unordered_set<std::string_view> invalid_types_;
+    std::unordered_map<std::string_view, event_port_wrapper*>
+        casted_port_mapper_;
   };
 
   template <typename... event_ts>
