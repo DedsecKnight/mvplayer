@@ -68,6 +68,11 @@ void video_reader::handle_termination_signal() noexcept {
 
 std::optional<video_info> video_reader::load_video(
     const std::filesystem::path& filename) noexcept {
+  if (format_context_ptr_ != nullptr) {
+    // In case there's already a video loaded, we unload the current video
+    // before loading a new one in
+    avformat_close_input(&format_context_ptr_);
+  }
   spdlog::info("Reading video file: {}", filename.filename().string());
   if (avformat_open_input(&format_context_ptr_, filename.c_str(), nullptr,
                           nullptr) != 0) {
