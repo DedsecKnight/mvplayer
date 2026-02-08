@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_render.h>
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_timer.h>
 #include <libavutil/frame.h>
@@ -61,7 +62,7 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   int32_t padded_height = height_ + (2 * padding_);
 
   window_ =
-      sdl_manager::create_window("video-player", padded_width, padded_height);
+      sdl_manager::create_window("video-player", WINDOW_WIDTH, WINDOW_HEIGHT);
   if (window_ == nullptr) {
     throw std::runtime_error{
         std::format("Error creating window: {}", SDL_GetError())};
@@ -73,6 +74,11 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
     throw std::runtime_error{
         std::format("Error creating renderer: {}", SDL_GetError())};
   }
+
+  SDL_SetRenderLogicalPresentation(
+      renderer_.get(), padded_width, padded_height,
+      SDL_RendererLogicalPresentation::SDL_LOGICAL_PRESENTATION_LETTERBOX);
+
   render_roi_ = {.x = static_cast<float>(padding_),
                  .y = static_cast<float>(padding_),
                  .w = static_cast<float>(width_),
@@ -203,10 +209,16 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
       spdlog::critical("Frame renderer is {}ms behind for frame no {}",
                        curr_frame_ts - expected_render_time,
                        event.payload().frame_num);
+      playback_state_.extra_time.fetch_add(curr_frame_ts -
+                                           expected_render_time);
+      playback_state_.expected_frame_no++;
+      av_frame_free(&frame);
+
+      return;
     } else {
-      auto wait_time = expected_render_time - curr_frame_ts;
-      SDL_Delay(wait_time);
-      spdlog::trace("Slept for {}ms", wait_time);
+      // auto wait_time = expected_render_time - curr_frame_ts;
+      // SDL_Delay(wait_time);
+      // spdlog::trace("Slept for {}ms", wait_time);
     }
   }
 
