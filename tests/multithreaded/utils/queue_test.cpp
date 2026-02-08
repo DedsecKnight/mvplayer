@@ -49,7 +49,7 @@ TEST(SPSCQueueTest, BasicDataType) {
 }
 
 TEST(SPSCQueueTest, PushFullQueue) {
-  multithreaded::utils::spsc_queue<int, 3> queue{};
+  multithreaded::utils::spsc_queue<int> queue{};
   for (int i = 0; i < 3; i++) {
     EXPECT_EQ(queue.push(i), true);
   }
@@ -67,7 +67,7 @@ TEST(SPSCQueueTest, LargeDataStream) {
   for (auto& elem : random_values) {
     elem = rand();
   }
-  multithreaded::utils::spsc_queue<int, 131071> queue{};
+  multithreaded::utils::spsc_queue<int> queue{131071};
   std::thread producer{[&queue, &random_values]() {
     for (size_t i{}; i < random_values.size(); i++) {
       EXPECT_EQ(queue.push(random_values[i]), true);

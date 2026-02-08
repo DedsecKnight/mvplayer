@@ -8,6 +8,9 @@ int main(int argc, char** argv) {
   multithreaded::engine engine{};
   constexpr int32_t padding = 10;
 
+  constexpr size_t picture_frame_queue_size = 15;
+  constexpr size_t audio_frame_queue_size = 31;
+
   auto video_reader =
       engine.create_processor<mvplayer::video_reader>("video-reader");
 
@@ -18,12 +21,14 @@ int main(int argc, char** argv) {
       engine.create_processor<mvplayer::audio_renderer>("audio-renderer");
 
   frame_renderer.subscribe_to<mvplayer::events::new_frame_loaded,
-                              mvplayer::events::new_video_loaded>(video_reader);
+                              mvplayer::events::new_video_loaded>(
+      video_reader, picture_frame_queue_size);
   video_reader.subscribe_to<mvplayer::events::playback_toggled,
                             mvplayer::events::seek_request>(frame_renderer);
 
   audio_renderer.subscribe_to<mvplayer::events::new_audio_samples_loaded,
-                              mvplayer::events::new_video_loaded>(video_reader);
+                              mvplayer::events::new_video_loaded>(
+      video_reader, audio_frame_queue_size);
 
   audio_renderer.subscribe_to<mvplayer::events::playback_toggled>(
       frame_renderer);

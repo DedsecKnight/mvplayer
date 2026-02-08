@@ -11,6 +11,7 @@
 #include "connector/connector.hpp"
 #include "engine/utils.hpp"
 #include "processor/any.hpp"
+#include "utils/constants.hpp"
 #include "utils/traits.hpp"
 
 namespace multithreaded {
@@ -33,9 +34,11 @@ class engine {
     [[nodiscard]] std::string_view name() const noexcept { return name_; }
 
     template <typename... event_ts>
-    void subscribe_to(const auto& other) const noexcept {
+    void subscribe_to(
+        const auto& other,
+        size_t queue_size = constants::DEFAULT_QUEUE_SIZE) const noexcept {
       auto [read_port, write_port] =
-          engine_ref_.get().create_connector<event_ts...>();
+          engine_ref_.get().create_connector<event_ts...>(queue_size);
 
       processor_ref_.get().as<processor_t>().add_read_port(
           other.name(), std::move(read_port));
@@ -89,8 +92,8 @@ class engine {
 
  private:
   template <typename... event_ts>
-  [[nodiscard]] decltype(auto) create_connector() noexcept {
-    connectors_.emplace_back(connector_event_set<event_ts...>{});
+  [[nodiscard]] decltype(auto) create_connector(size_t queue_size) noexcept {
+    connectors_.emplace_back(connector_event_set<event_ts...>{}, queue_size);
     auto& event_connector = connectors_.back().as_connector_of<event_ts...>();
     return std::make_pair(event_connector.get_read_port(),
                           event_connector.get_write_port());
@@ -99,7 +102,8 @@ class engine {
   template <typename processor_t>
   void inject_system_event_writer(processor::any& processor) {
     auto [read_port, write_port] =
-        create_connector<system_events::system_terminate_request_event>();
+        create_connector<system_events::system_terminate_request_event>(
+            constants::DEFAULT_QUEUE_SIZE);
     system_event_read_ports_.emplace_back(read_port);
     processor.as<processor_t>().add_write_port(constants::ENGINE_IDENTIFIER,
                                                std::move(write_port));

@@ -7,17 +7,18 @@
 #include <chrono>
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
+
+#include "constants.hpp"
 
 namespace multithreaded::utils {
 
 namespace queue_details {
-static constexpr size_t DEFAULT_QUEUE_SIZE = 7;
 static constexpr int32_t DEFAULT_WAIT_TIME_MS = 512;
 }  // namespace queue_details
 
 /// Single Producer - Single Consumer Lock-free Ring Buffer
-template <typename T, std::size_t Size = queue_details::DEFAULT_QUEUE_SIZE>
-  requires(std::has_single_bit(Size + 1))
+template <typename T>
 class spsc_queue {
  private:
   static constexpr size_t CACHE_LINE_SIZE = 64;
@@ -25,7 +26,12 @@ class spsc_queue {
  public:
   using elem_t = T;
 
-  spsc_queue() : data_(sizeof(T) * (Size + 1)) {}
+  explicit spsc_queue(size_t queue_size = constants::DEFAULT_QUEUE_SIZE)
+      : data_(sizeof(T) * (queue_size + 1)), capacity_{queue_size} {
+    if (!std::has_single_bit(queue_size + 1)) {
+      throw std::invalid_argument{"invalid queue size"};
+    }
+  }
 
   [[nodiscard]] bool push(const T& elem) noexcept { return emplace(elem); }
 
@@ -33,7 +39,8 @@ class spsc_queue {
     requires std::constructible_from<T, ArgTs...>
   [[nodiscard]] bool emplace(ArgTs&&... args) noexcept {
     auto current_write_index = write_index_.load(std::memory_order_relaxed);
-    auto next_write_index = (current_write_index + 1) & Size;
+    auto next_write_index =
+        (current_write_index + 1) & capacity_.load(std::memory_order_relaxed);
     int64_t wait_time_ms = 1;
     while (next_write_index == read_index_.load(std::memory_order_acquire)) {
       if (wait_time_ms >= queue_details::DEFAULT_WAIT_TIME_MS) {
@@ -59,7 +66,9 @@ class spsc_queue {
     // NOLINTBEGIN
     std::construct_at(
         std::launder(reinterpret_cast<T*>(
-            data_.data() + (sizeof(T) * (current_write_index & Size)))),
+            data_.data() +
+            (sizeof(T) * (current_write_index &
+                          capacity_.load(std::memory_order_relaxed))))),
         std::forward<ArgTs>(args)...);
     // NOLINTEND
 
@@ -76,21 +85,25 @@ class spsc_queue {
 
     // NOLINTBEGIN
     T* queue_element = std::launder(reinterpret_cast<T*>(
-        data_.data() + (sizeof(T) * (current_read_index & Size))));
+        data_.data() +
+        (sizeof(T) *
+         (current_read_index & capacity_.load(std::memory_order_relaxed)))));
     // NOLINTEND
 
     std::construct_at(&elem, *queue_element);
     queue_element->~T();
 
-    read_index_.store((current_read_index + 1) & Size,
-                      std::memory_order_release);
+    read_index_.store(
+        (current_read_index + 1) & capacity_.load(std::memory_order_relaxed),
+        std::memory_order_release);
     return true;
   }
 
  private:
+  alignas(CACHE_LINE_SIZE) std::vector<std::byte> data_;
+  alignas(CACHE_LINE_SIZE) std::atomic<size_t> capacity_;
   alignas(CACHE_LINE_SIZE) std::atomic<size_t> read_index_{0};
   alignas(CACHE_LINE_SIZE) std::atomic<size_t> write_index_{0};
-  alignas(CACHE_LINE_SIZE) std::vector<std::byte> data_;
 };
 
 }  // namespace multithreaded::utils
