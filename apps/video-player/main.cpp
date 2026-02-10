@@ -8,17 +8,20 @@ int main(int argc, char** argv) {
   multithreaded::engine engine{};
   constexpr int32_t padding = 10;
 
-  constexpr size_t picture_frame_queue_size = 15;
+  constexpr size_t picture_frame_queue_size = 7;
   constexpr size_t audio_frame_queue_size = 31;
 
-  auto video_reader =
-      engine.create_processor<mvplayer::video_reader>("video-reader");
+  mvplayer::frame_pool picture_frame_pool{31};
+  mvplayer::frame_pool audio_frame_pool{31};
+
+  auto video_reader = engine.create_processor<mvplayer::video_reader>(
+      "video-reader", std::ref(picture_frame_pool), std::ref(audio_frame_pool));
 
   auto frame_renderer = engine.create_processor<mvplayer::frame_renderer>(
-      "frame-renderer", padding);
+      "frame-renderer", padding, std::ref(picture_frame_pool));
 
-  auto audio_renderer =
-      engine.create_processor<mvplayer::audio_renderer>("audio-renderer");
+  auto audio_renderer = engine.create_processor<mvplayer::audio_renderer>(
+      "audio-renderer", std::ref(audio_frame_pool));
 
   frame_renderer.subscribe_to<mvplayer::events::new_frame_loaded,
                               mvplayer::events::new_video_loaded>(

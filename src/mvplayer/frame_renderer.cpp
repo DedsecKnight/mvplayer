@@ -7,6 +7,8 @@
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_timer.h>
 #include <libavutil/frame.h>
+
+#include <functional>
 extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/pixfmt.h>
@@ -25,13 +27,16 @@ extern "C" {
 
 namespace mvplayer {
 
-frame_renderer::frame_renderer(int32_t padding) : padding_{padding} {}
+frame_renderer::frame_renderer(
+    int32_t padding, const std::reference_wrapper<frame_pool>& frame_pool)
+    : frame_pool_{frame_pool}, padding_{padding} {}
 
 frame_renderer::frame_renderer(frame_renderer&& renderer) noexcept
     : event_listener_{std::move(renderer.event_listener_)},
       window_{renderer.window_.release()},
       renderer_{renderer.renderer_.release()},
       texture_{renderer.texture_.release()},
+      frame_pool_{renderer.frame_pool_},
       playback_state_{std::move(renderer.playback_state_)},
       width_{renderer.width_},
       height_{renderer.height_},
@@ -43,6 +48,7 @@ frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
   window_ = sdl_window{renderer.window_.release()};
   renderer_ = sdl_renderer{renderer.renderer_.release()};
   texture_ = sdl_texture{renderer.texture_.release()};
+  frame_pool_ = renderer.frame_pool_;
   playback_state_ = std::move(renderer.playback_state_);
   width_ = renderer.width_;
   height_ = renderer.height_;
@@ -212,14 +218,15 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
       playback_state_.extra_time.fetch_add(curr_frame_ts -
                                            expected_render_time);
       playback_state_.expected_frame_no++;
-      av_frame_free(&frame);
-
+      frame_pool_.get().release_frame(frame);
       return;
-    } else {
-      // auto wait_time = expected_render_time - curr_frame_ts;
-      // SDL_Delay(wait_time);
-      // spdlog::trace("Slept for {}ms", wait_time);
     }
+    auto wait_time = expected_render_time - curr_frame_ts;
+    while (curr_frame_ts < expected_render_time) {
+      SDL_Delay(1);
+      curr_frame_ts = SDL_GetTicks();
+    }
+    spdlog::trace("Slept for {}ms", wait_time);
   }
 
   if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr,
@@ -230,7 +237,7 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
   }
 
   playback_state_.expected_frame_no++;
-  av_frame_free(&frame);
+  frame_pool_.get().release_frame(frame);
 }
 
 frame_renderer::~frame_renderer() noexcept {

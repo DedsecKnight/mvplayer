@@ -46,6 +46,7 @@ video_reader::video_reader(video_reader&& reader) noexcept
     : frame_ctx_{std::move(reader.frame_ctx_)},
       audio_ctx_{std::move(reader.audio_ctx_)},
       frame_decoder_{std::move(reader.frame_decoder_)},
+      frame_pools_{reader.frame_pools_},
       is_paused_{reader.is_paused_.load(std::memory_order_acquire)} {
   std::swap(format_context_ptr_, reader.format_context_ptr_);
 }
@@ -55,6 +56,7 @@ video_reader& video_reader::operator=(video_reader&& reader) noexcept {
   frame_ctx_ = std::move(reader.frame_ctx_);
   audio_ctx_ = std::move(reader.audio_ctx_);
   frame_decoder_ = std::move(reader.frame_decoder_);
+  frame_pools_ = reader.frame_pools_;
   is_paused_ = reader.is_paused_.load(std::memory_order_acquire);
   return *this;
 }
@@ -188,7 +190,7 @@ void video_reader::picture_frame_handler(AVFrame* picture_frame,
     return;
   }
   event_handler_t::broadcast(
-      events::new_frame_loaded{.frame = av_frame_clone(picture_frame),
+      events::new_frame_loaded{.frame = picture_frame,
                                .frame_num = frame_ctx_.codec_ctx().frame_num,
                                .frame_pts = picture_frame->pts,
                                .reset_frame_sequence = reset_frame_sequence});
@@ -201,7 +203,7 @@ void video_reader::audio_frame_handler(AVFrame* audio_frame,
     return;
   }
   event_handler_t::broadcast(events::new_audio_samples_loaded{
-      .frame = av_frame_clone(audio_frame),
+      .frame = audio_frame,
       .frame_num = audio_codec_ctx.frame_num,
       .num_channels = audio_codec_ctx.ch_layout.nb_channels,
       .reset_frame_sequence = reset_frame_sequence});
@@ -236,7 +238,6 @@ void video_reader::operator()(const seek_request_event& event) {
 
 void video_reader::decode_video() noexcept {
   av_packet packet{av_packet_alloc()};
-  av_frame frame{av_frame_alloc()};
 
   std::array<media_context*, 2> media_contexts{&frame_ctx_, &audio_ctx_};
   std::array<bool, 2> reset_frame_seq{true, true};
@@ -279,15 +280,25 @@ void video_reader::decode_video() noexcept {
       if (is_paused_.load(std::memory_order_acquire)) {
         continue;
       }
-      ret = avcodec_receive_frame(&codec_ctx, frame.get());
-      if (ret == AVERROR(EAGAIN)) {
-        break;
+      auto frame_result =
+          frame_pools_.at(context_index).get().get_frame(&codec_ctx);
+      if (!frame_result.has_value()) {
+        if (frame_result.error() == AVERROR(EAGAIN)) {
+          break;
+        } else {
+          spdlog::critical(
+              "Unexpected error when getting next frame. Requesting "
+              "termination...");
+          std::ignore = request_termination();
+          return;
+        }
       }
-      frame_handlers.at(context_index)(frame.get(),
+
+      auto* frame = frame_result.value();
+      frame_handlers.at(context_index)(frame,
                                        reset_frame_seq.at(context_index));
       reset_frame_seq.at(context_index) = false;
       media_contexts.at(context_index)->update_most_recent_pts(frame->pts);
-      av_frame_unref(frame.get());
     }
   }
 }

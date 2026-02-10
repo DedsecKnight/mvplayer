@@ -18,6 +18,7 @@ namespace mvplayer {
 audio_renderer::audio_renderer(audio_renderer&& renderer) noexcept
     : playback_state_{renderer.playback_state_},
       audio_stream_{renderer.audio_stream_.release()},
+      frame_pool_{renderer.frame_pool_},
       is_paused_{renderer.is_paused_} {}
 
 audio_renderer& audio_renderer::operator=(audio_renderer&& renderer) noexcept {
@@ -142,7 +143,6 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
   auto* frame = event.payload().frame;
   const auto audio_buffer =
       generate_audio_buffer(frame, event.payload().num_channels);
-  av_frame_free(&frame);
 
   if (!SDL_PutAudioStreamData(audio_stream_.get(), audio_buffer.data(),
                               static_cast<int32_t>(audio_buffer.size()))) {
@@ -154,6 +154,7 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
     std::ignore = request_termination();
   }
   playback_state_.expected_frame_no++;
+  frame_pool_.get().release_frame(frame);
 }
 
 void audio_renderer::operator()(const new_video_loaded_event& event) {

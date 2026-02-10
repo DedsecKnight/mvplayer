@@ -3,6 +3,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_audio.h>
 
+#include "frame_pool.hpp"
+
 extern "C" {
 #include <libavutil/channel_layout.h>
 #include <libavutil/samplefmt.h>
@@ -37,7 +39,8 @@ class audio_renderer
   };
 
  public:
-  audio_renderer() = default;
+  explicit audio_renderer(const std::reference_wrapper<frame_pool>& frame_pool)
+      : frame_pool_{frame_pool} {}
 
   audio_renderer(const audio_renderer&) = delete;
   audio_renderer& operator=(const audio_renderer&) = delete;
@@ -72,6 +75,7 @@ class audio_renderer
   audio_playback_state playback_state_{};
   sdl_audio_stream audio_stream_{nullptr};
   SwrContext* resample_context_{nullptr};
+  std::reference_wrapper<frame_pool> frame_pool_;
   int32_t audio_sample_rate_{};
   bool is_paused_{false};
 };

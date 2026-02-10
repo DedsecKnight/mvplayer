@@ -7,6 +7,7 @@
 
 #include "events.hpp"
 #include "events/handler.hpp"
+#include "frame_pool.hpp"
 #include "info.hpp"
 #include "media_context.hpp"
 #include "processor/termination_handler.hpp"
@@ -38,7 +39,9 @@ class video_reader
  public:
   ~video_reader() noexcept override;
 
-  video_reader() = default;
+  video_reader(const std::reference_wrapper<frame_pool>& picture_frame_pool,
+               const std::reference_wrapper<frame_pool>& audio_frame_pool)
+      : frame_pools_{picture_frame_pool, audio_frame_pool} {}
 
   video_reader(const video_reader&) = delete;
   video_reader& operator=(const video_reader&) = delete;
@@ -75,6 +78,10 @@ class video_reader
 
   // Separate thread used for decoding frames
   std::thread frame_decoder_;
+
+  // Frame pools. frame_pools_[0] is for picture frame, frame_pools_[1] is for
+  // audio frame
+  std::array<std::reference_wrapper<frame_pool>, 2> frame_pools_;
 
   // Main thread will write seek request (in pts), decode thread will pull and
   // call av_seek_frame

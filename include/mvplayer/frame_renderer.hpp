@@ -1,6 +1,8 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+
+#include "frame_pool.hpp"
 extern "C" {
 #include <libswscale/swscale.h>
 }
@@ -97,7 +99,8 @@ class frame_renderer
     return is_paused_.load(std::memory_order_acquire);
   }
 
-  [[nodiscard]] explicit frame_renderer(int32_t padding);
+  [[nodiscard]] explicit frame_renderer(
+      int32_t padding, const std::reference_wrapper<frame_pool>& frame_pool);
   void operator()(const new_frame_loaded_event& event) override;
   void operator()(const new_video_loaded_event& event) override;
   ~frame_renderer() noexcept override;
@@ -111,6 +114,7 @@ class frame_renderer
   sdl_window window_{nullptr};
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
+  std::reference_wrapper<frame_pool> frame_pool_;
   video_playback_state playback_state_;
   SDL_Rect frame_roi_{};
   SDL_FRect render_roi_{};
