@@ -39,8 +39,7 @@ class spsc_queue {
     requires std::constructible_from<T, ArgTs...>
   [[nodiscard]] bool emplace(ArgTs&&... args) noexcept {
     auto current_write_index = write_index_.load(std::memory_order_relaxed);
-    auto next_write_index =
-        (current_write_index + 1) & capacity_.load(std::memory_order_relaxed);
+    auto next_write_index = (current_write_index + 1) & capacity_;
     int64_t wait_time_ms = 1;
     while (next_write_index == read_index_.load(std::memory_order_acquire)) {
       if (wait_time_ms >= queue_details::DEFAULT_WAIT_TIME_MS) {
@@ -66,9 +65,7 @@ class spsc_queue {
     // NOLINTBEGIN
     std::construct_at(
         std::launder(reinterpret_cast<T*>(
-            data_.data() +
-            (sizeof(T) * (current_write_index &
-                          capacity_.load(std::memory_order_relaxed))))),
+            data_.data() + (sizeof(T) * (current_write_index & capacity_)))),
         std::forward<ArgTs>(args)...);
     // NOLINTEND
 
@@ -85,23 +82,20 @@ class spsc_queue {
 
     // NOLINTBEGIN
     T* queue_element = std::launder(reinterpret_cast<T*>(
-        data_.data() +
-        (sizeof(T) *
-         (current_read_index & capacity_.load(std::memory_order_relaxed)))));
+        data_.data() + (sizeof(T) * (current_read_index & capacity_))));
     // NOLINTEND
 
     std::construct_at(&elem, *queue_element);
     queue_element->~T();
 
-    read_index_.store(
-        (current_read_index + 1) & capacity_.load(std::memory_order_relaxed),
-        std::memory_order_release);
+    read_index_.store((current_read_index + 1) & capacity_,
+                      std::memory_order_release);
     return true;
   }
 
  private:
   alignas(CACHE_LINE_SIZE) std::vector<std::byte> data_;
-  alignas(CACHE_LINE_SIZE) std::atomic<size_t> capacity_;
+  alignas(CACHE_LINE_SIZE) size_t capacity_;
   alignas(CACHE_LINE_SIZE) std::atomic<size_t> read_index_{0};
   alignas(CACHE_LINE_SIZE) std::atomic<size_t> write_index_{0};
 };
