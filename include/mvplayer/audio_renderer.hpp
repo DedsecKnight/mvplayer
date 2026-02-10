@@ -38,9 +38,11 @@ class audio_renderer
     int64_t expected_frame_no{1};
   };
 
+  static constexpr size_t DEFAULT_AUDIO_BUFFER_SIZE = 192'000;
+
  public:
   explicit audio_renderer(const std::reference_wrapper<frame_pool>& frame_pool)
-      : frame_pool_{frame_pool} {}
+      : audio_buffer_(DEFAULT_AUDIO_BUFFER_SIZE), frame_pool_{frame_pool} {}
 
   audio_renderer(const audio_renderer&) = delete;
   audio_renderer& operator=(const audio_renderer&) = delete;
@@ -61,21 +63,24 @@ class audio_renderer
   ~audio_renderer() noexcept override;
 
  private:
-  std::vector<uint8_t> generate_audio_buffer(AVFrame* frame,
-                                             int num_channels) noexcept;
-  std::vector<uint8_t> generate_packed_planar_sample(
+  [[nodiscard]] bool generate_audio_buffer(AVFrame* frame,
+                                           int num_channels) noexcept;
+  [[nodiscard]] bool generate_packed_planar_sample(
       AVFrame* frame, int32_t num_channels) noexcept;
-  std::vector<uint8_t> generate_non_planar_sample(
-      AVFrame* frame, int32_t num_channels) noexcept;
+  [[nodiscard]] bool generate_non_planar_sample(AVFrame* frame,
+                                                int32_t num_channels) noexcept;
 
   [[nodiscard]] bool initialize_swr_context(AVSampleFormat input_fmt,
                                             AVSampleFormat output_fmt) noexcept;
 
+  std::vector<uint8_t> audio_buffer_;
   AVChannelLayout* channel_layout_ptr_{nullptr};
   audio_playback_state playback_state_{};
   sdl_audio_stream audio_stream_{nullptr};
   SwrContext* resample_context_{nullptr};
   std::reference_wrapper<frame_pool> frame_pool_;
+  // Stores the number of bytes that actually contains audio data
+  size_t audio_buffer_size_{};
   int32_t audio_sample_rate_{};
   bool is_paused_{false};
 };

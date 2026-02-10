@@ -16,13 +16,15 @@ extern "C" {
 
 namespace mvplayer {
 audio_renderer::audio_renderer(audio_renderer&& renderer) noexcept
-    : playback_state_{renderer.playback_state_},
+    : audio_buffer_{std::move(renderer.audio_buffer_)},
+      playback_state_{renderer.playback_state_},
       audio_stream_{renderer.audio_stream_.release()},
       frame_pool_{renderer.frame_pool_},
       is_paused_{renderer.is_paused_} {}
 
 audio_renderer& audio_renderer::operator=(audio_renderer&& renderer) noexcept {
   playback_state_ = renderer.playback_state_;
+  audio_buffer_ = std::move(renderer.audio_buffer_);
   audio_stream_ = sdl_audio_stream{renderer.audio_stream_.release()};
   is_paused_ = renderer.is_paused_;
   return *this;
@@ -56,20 +58,23 @@ bool audio_renderer::initialize_swr_context(
   return true;
 }
 
-std::vector<uint8_t> audio_renderer::generate_non_planar_sample(
+[[nodiscard]] bool audio_renderer::generate_non_planar_sample(
     AVFrame* frame, int32_t num_channels) noexcept {
-  std::vector<uint8_t> audio_buffer;
   const auto input_format = static_cast<AVSampleFormat>(frame->format);
   const auto num_samples = frame->nb_samples;
   const auto sample_size =
       static_cast<size_t>(av_get_bytes_per_sample(input_format));
-  const auto buffer_size = sample_size * num_samples * num_channels;
-  audio_buffer.resize(buffer_size);
-  std::memcpy(audio_buffer.data(), frame->data[0], audio_buffer.size());
-  return audio_buffer;
+  audio_buffer_size_ = sample_size * num_samples * num_channels;
+  if (audio_buffer_.size() < audio_buffer_size_) {
+    const auto multiplier =
+        (audio_buffer_size_ + audio_buffer_.size() - 1) / audio_buffer_.size();
+    audio_buffer_.resize(audio_buffer_.size() * multiplier);
+  }
+  std::memcpy(audio_buffer_.data(), frame->data[0], audio_buffer_size_);
+  return true;
 }
 
-std::vector<uint8_t> audio_renderer::generate_packed_planar_sample(
+[[nodiscard]] bool audio_renderer::generate_packed_planar_sample(
     AVFrame* frame, int32_t num_channels) noexcept {
   const auto input_fmt = static_cast<AVSampleFormat>(frame->format);
   const auto output_fmt = av_get_packed_sample_fmt(input_fmt);
@@ -77,7 +82,7 @@ std::vector<uint8_t> audio_renderer::generate_packed_planar_sample(
   if (resample_context_ == nullptr &&
       !initialize_swr_context(input_fmt, output_fmt)) {
     spdlog::error("Error initializing swresample context");
-    return {};
+    return false;
   }
 
   std::vector<uint8_t*> out_data{nullptr};
@@ -91,7 +96,7 @@ std::vector<uint8_t> audio_renderer::generate_packed_planar_sample(
 
   if (ret < 0) {
     spdlog::error("Error allocating samples");
-    return {};
+    return false;
   }
 
   int32_t num_samples_written = swr_convert(
@@ -100,25 +105,29 @@ std::vector<uint8_t> audio_renderer::generate_packed_planar_sample(
 
   if (num_samples_written < 0) {
     spdlog::error("Error writing samples");
-    return {};
+    return false;
   }
 
   if (num_samples_written != frame->nb_samples) {
     spdlog::error("Expected to write {} samples. Only {} samples are written",
                   frame->nb_samples, num_samples_written);
-    return {};
+    return false;
   }
 
-  size_t audio_buffer_size =
+  audio_buffer_size_ =
       static_cast<size_t>(out_sample_size) * num_channels * num_samples_written;
-  std::vector<uint8_t> audio_buffer(audio_buffer_size);
-  std::memcpy(audio_buffer.data(), out_data[0], audio_buffer_size);
+  if (audio_buffer_.size() < audio_buffer_size_) {
+    const auto multiplier =
+        (audio_buffer_size_ + audio_buffer_.size() - 1) / audio_buffer_.size();
+    audio_buffer_.resize(audio_buffer_.size() * multiplier);
+  }
+  std::memcpy(audio_buffer_.data(), out_data[0], audio_buffer_size_);
   av_freep(static_cast<void*>(out_data.data()));
 
-  return audio_buffer;
+  return true;
 }
 
-std::vector<uint8_t> audio_renderer::generate_audio_buffer(
+[[nodiscard]] bool audio_renderer::generate_audio_buffer(
     AVFrame* frame, int32_t num_channels) noexcept {
   const auto audio_format = static_cast<AVSampleFormat>(frame->format);
   if (av_sample_fmt_is_planar(audio_format) == 1) {
@@ -141,11 +150,14 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
   }
 
   auto* frame = event.payload().frame;
-  const auto audio_buffer =
-      generate_audio_buffer(frame, event.payload().num_channels);
+  if (!generate_audio_buffer(frame, event.payload().num_channels)) {
+    spdlog::error("Error generating audio buffer. Requesting termination...");
+    std::ignore = request_termination();
+    return;
+  }
 
-  if (!SDL_PutAudioStreamData(audio_stream_.get(), audio_buffer.data(),
-                              static_cast<int32_t>(audio_buffer.size()))) {
+  if (!SDL_PutAudioStreamData(audio_stream_.get(), audio_buffer_.data(),
+                              static_cast<int32_t>(audio_buffer_size_))) {
     spdlog::error("Error enqueueing audio sample: {}", SDL_GetError());
     std::ignore = request_termination();
   }
