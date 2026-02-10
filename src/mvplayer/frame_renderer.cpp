@@ -101,6 +101,7 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   }
 
   if (converted_frame_holder_ != nullptr) {
+    av_freep(static_cast<void*>(&converted_frame_holder_->data[0]));
     av_frame_free(&converted_frame_holder_);
   }
   if (conversion_context_ != nullptr) {
@@ -221,12 +222,11 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
       frame_pool_.get().release_frame(frame);
       return;
     }
-    auto wait_time = expected_render_time - curr_frame_ts;
-    while (curr_frame_ts < expected_render_time) {
-      SDL_Delay(1);
-      curr_frame_ts = SDL_GetTicks();
-    }
-    spdlog::trace("Slept for {}ms", wait_time);
+    std::chrono::milliseconds wait_time{expected_render_time - curr_frame_ts};
+    SDL_DelayPrecise(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(wait_time)
+            .count());
+    spdlog::trace("Slept for {}ms", wait_time.count());
   }
 
   if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr,
@@ -242,6 +242,7 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
 
 frame_renderer::~frame_renderer() noexcept {
   if (converted_frame_holder_ != nullptr) {
+    av_freep(static_cast<void*>(&converted_frame_holder_->data[0]));
     av_frame_free(&converted_frame_holder_);
   }
   if (conversion_context_ != nullptr) {
