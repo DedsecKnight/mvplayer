@@ -42,7 +42,7 @@ class audio_renderer
 
  public:
   explicit audio_renderer(const std::reference_wrapper<frame_pool>& frame_pool)
-      : audio_buffer_(DEFAULT_AUDIO_BUFFER_SIZE), frame_pool_{frame_pool} {}
+      : frame_pool_{frame_pool} {}
 
   audio_renderer(const audio_renderer&) = delete;
   audio_renderer& operator=(const audio_renderer&) = delete;
@@ -63,17 +63,17 @@ class audio_renderer
   ~audio_renderer() noexcept override;
 
  private:
-  [[nodiscard]] bool generate_audio_buffer(AVFrame* frame,
-                                           int num_channels) noexcept;
-  [[nodiscard]] bool generate_packed_planar_sample(
+  [[nodiscard]] std::span<uint8_t> generate_audio_buffer(
+      AVFrame* frame, int num_channels) noexcept;
+  [[nodiscard]] std::span<uint8_t> generate_packed_planar_sample(
       AVFrame* frame, int32_t num_channels) noexcept;
-  [[nodiscard]] bool generate_non_planar_sample(AVFrame* frame,
-                                                int32_t num_channels) noexcept;
+  [[nodiscard]] std::span<uint8_t> generate_non_planar_sample(
+      AVFrame* frame, int32_t num_channels) noexcept;
 
   [[nodiscard]] bool initialize_swr_context(AVSampleFormat input_fmt,
                                             AVSampleFormat output_fmt) noexcept;
 
-  std::vector<uint8_t> audio_buffer_;
+  std::vector<uint8_t*> av_sample_buffer_{nullptr};
   AVChannelLayout* channel_layout_ptr_{nullptr};
   audio_playback_state playback_state_{};
   sdl_audio_stream audio_stream_{nullptr};
@@ -81,7 +81,7 @@ class audio_renderer
   std::reference_wrapper<frame_pool> frame_pool_;
   // Stores the number of bytes that actually contains audio data
   size_t audio_buffer_size_{};
-  int32_t audio_sample_rate_{};
+  int32_t audio_sample_rate_{}, max_num_samples_{};
   bool is_paused_{false};
 };
 }  // namespace mvplayer
