@@ -35,6 +35,11 @@ cmake --build --preset conan-release
 
 ### Running the Program
 
+If your machine is using Wayland, set the `EGL_DISPLAY` environment variable before running:
+```bash
+export EGL_DISPLAY=wayland
+```
+
 ```bash
 ./build/Release/apps/video-player/video_player -i /path/to/video_file.mp4
 ```
