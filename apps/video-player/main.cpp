@@ -5,7 +5,6 @@
 #include "video_reader.hpp"
 
 int main(int argc, char** argv) {
-  multithreaded::engine engine{};
   constexpr int32_t padding = 10;
 
   constexpr size_t picture_frame_queue_size = 7;
@@ -13,6 +12,7 @@ int main(int argc, char** argv) {
 
   mvplayer::frame_pool picture_frame_pool{15};
   mvplayer::frame_pool audio_frame_pool{63};
+  multithreaded::engine engine{};
 
   auto video_reader = engine.create_processor<mvplayer::video_reader>(
       "video-reader", std::ref(picture_frame_pool), std::ref(audio_frame_pool));
