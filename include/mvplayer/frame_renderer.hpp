@@ -2,7 +2,6 @@
 
 #include <SDL3/SDL.h>
 
-#include "frame_pool.hpp"
 extern "C" {
 #include <libswscale/swscale.h>
 }
@@ -13,6 +12,7 @@ extern "C" {
 #include "events.hpp"
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
+#include "frame_pool.hpp"
 #include "processor/interruptible.hpp"
 #include "processor/termination_handler.hpp"
 #include "utils/constants.hpp"
