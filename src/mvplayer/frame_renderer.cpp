@@ -6,11 +6,12 @@
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_timer.h>
-#include <libavutil/frame.h>
 
 #include <functional>
 extern "C" {
+#include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/pixdesc.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
 }
@@ -133,7 +134,6 @@ bool frame_renderer::initialize_converted_frame_holder(
 }
 
 bool frame_renderer::convert_frame(AVFrame* frame) noexcept {
-  const AVPixelFormat supported_format = AVPixelFormat::AV_PIX_FMT_YUV420P;
   if (converted_frame_holder_ == nullptr &&
       !initialize_converted_frame_holder(frame)) {
     return false;
@@ -145,7 +145,7 @@ bool frame_renderer::convert_frame(AVFrame* frame) noexcept {
     conversion_context_ = sws_getContext(
         frame->width, frame->height, static_cast<AVPixelFormat>(frame->format),
         converted_frame_holder_->width, converted_frame_holder_->height,
-        supported_format,
+        SUPPORTED_FORMAT,
         SWS_FAST_BILINEAR | SWS_FULL_CHR_H_INT | SWS_ACCURATE_RND,  // NOLINT
         nullptr, nullptr, nullptr);
   }
@@ -173,9 +173,10 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
 
   auto* frame = payload.frame;
   bool swap_frame = false;
-  if (frame->format != AVPixelFormat::AV_PIX_FMT_YUV420P) {
+  if (frame->format != SUPPORTED_FORMAT) {
     if (!convert_frame(frame)) {
-      spdlog::error("Error converting frame to YUV420P");
+      spdlog::error("Error converting frame to {}",
+                    av_get_pix_fmt_name(SUPPORTED_FORMAT));
       std::ignore = request_termination();
     }
     std::swap(frame, converted_frame_holder_);
