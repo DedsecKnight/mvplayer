@@ -10,8 +10,8 @@ int main(int argc, char** argv) {
   constexpr size_t picture_frame_queue_size = 7;
   constexpr size_t audio_frame_queue_size = 31;
 
-  mvplayer::frame_pool picture_frame_pool{15};
-  mvplayer::frame_pool audio_frame_pool{63};
+  mvplayer::frame_pool picture_frame_pool{(picture_frame_queue_size * 2) + 1};
+  mvplayer::frame_pool audio_frame_pool{(audio_frame_queue_size * 2) + 1};
   multithreaded::engine engine{};
 
   auto video_reader = engine.create_processor<mvplayer::video_reader>(
