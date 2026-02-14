@@ -34,6 +34,7 @@ class frame_renderer
       AVPixelFormat::AV_PIX_FMT_YUV420P;
   static constexpr int32_t WINDOW_HEIGHT = 1440;
   static constexpr int32_t WINDOW_WIDTH = 2560;
+  static constexpr int32_t FRAME_ALLOC_ALIGNMENT = 32;
 
   struct video_playback_state {
     video_playback_state() = default;

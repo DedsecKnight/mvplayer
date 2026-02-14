@@ -120,7 +120,8 @@ bool frame_renderer::initialize_converted_frame_holder(
   }
   if (av_image_alloc(static_cast<uint8_t**>(converted_frame_holder_->data),
                      static_cast<int32_t*>(converted_frame_holder_->linesize),
-                     frame->width, frame->height, SUPPORTED_FORMAT, 1) < 0) {
+                     frame->width, frame->height, SUPPORTED_FORMAT,
+                     FRAME_ALLOC_ALIGNMENT) < 0) {
     av_frame_free(&converted_frame_holder_);
     return false;
   }
