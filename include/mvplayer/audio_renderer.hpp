@@ -12,6 +12,7 @@ extern "C" {
 }
 
 #include <cstdint>
+#include <span>
 
 #include "events.hpp"
 #include "events/envelope.hpp"

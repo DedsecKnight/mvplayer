@@ -85,6 +85,9 @@ target_sources(
       include/multithreaded/utils/queue.hpp
 )
 
+target_compile_features(mvplayer PRIVATE cxx_std_23)
+target_compile_features(multithreaded PRIVATE cxx_std_23)
+
 target_link_libraries(multithreaded PUBLIC spdlog::spdlog)
 target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog SDL3::SDL3 multithreaded CLI11::CLI11)
 
