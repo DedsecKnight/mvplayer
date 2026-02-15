@@ -35,6 +35,7 @@ find_package(ffmpeg REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(CLI11 REQUIRED)
+find_package(glad REQUIRED)
 
 add_library(mvplayer SHARED)
 add_library(multithreaded SHARED)
