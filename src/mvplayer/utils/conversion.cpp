@@ -14,7 +14,7 @@ namespace mvplayer::utils {
 
 SDL_AudioFormat to_sdl_format(AVSampleFormat ff_sample_format) {
   namespace ranges = std::ranges;
-  const auto* const mapping_it = ranges::find_if(
+  const auto mapping_it = ranges::find_if(
       AUDIO_FORMAT_MAPPING, [ff_sample_format](const auto& audio_mapping) {
         return audio_mapping.first == ff_sample_format;
       });

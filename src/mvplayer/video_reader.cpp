@@ -76,8 +76,8 @@ std::optional<video_info> video_reader::load_video(
     avformat_close_input(&format_context_ptr_);
   }
   spdlog::info("Reading video file: {}", filename.filename().string());
-  if (avformat_open_input(&format_context_ptr_, filename.c_str(), nullptr,
-                          nullptr) != 0) {
+  if (avformat_open_input(&format_context_ptr_, filename.string().c_str(),
+                          nullptr, nullptr) != 0) {
     spdlog::error("Error reading video file {}", filename.filename().string());
     return std::nullopt;
   }
@@ -221,7 +221,7 @@ void video_reader::operator()(const seek_request_event& event) {
                    AVRational{.num = 1, .den = AV_TIME_BASE});
 
   int64_t curr_seek_pos = seek_request_.load(std::memory_order_relaxed);
-  int64_t new_seek_pos = std::clamp(
+  int64_t new_seek_pos = std::clamp<int64_t>(
       (curr_seek_pos == -1 ? most_recent_pts_ts : curr_seek_pos) + delta_pts,
       0L, format_context_ptr_->duration);
 
@@ -230,7 +230,7 @@ void video_reader::operator()(const seek_request_event& event) {
     most_recent_pts_ts =
         av_rescale_q(frame_ctx_.most_recent_pts(), timebase,
                      AVRational{.num = 1, .den = AV_TIME_BASE});
-    new_seek_pos = std::clamp(
+    new_seek_pos = std::clamp<int64_t>(
         (curr_seek_pos == -1 ? most_recent_pts_ts : curr_seek_pos) + delta_pts,
         0L, format_context_ptr_->duration);
   }

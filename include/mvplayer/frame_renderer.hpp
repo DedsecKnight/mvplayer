@@ -6,8 +6,10 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
+#include <array>
 #include <atomic>
 #include <cstdint>
+#include <span>
 
 #include "events.hpp"
 #include "events/envelope.hpp"
