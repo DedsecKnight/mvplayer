@@ -17,8 +17,8 @@ class any_handler {
   any_handler(const any_handler&) = delete;
   any_handler& operator=(const any_handler&) = delete;
 
-  any_handler(any_handler&&) = default;
-  any_handler& operator=(any_handler&&) = default;
+  any_handler(any_handler&&) noexcept = default;
+  any_handler& operator=(any_handler&&) noexcept = default;
 
   template <typename... event_ts>
   void add_read_port(std::string_view sender_name,
