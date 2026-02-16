@@ -3,6 +3,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_audio.h>
 
+#include <string>
+
 #include "utils/owned.hpp"
 
 namespace mvplayer {
