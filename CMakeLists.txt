@@ -36,8 +36,8 @@ find_package(spdlog REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(CLI11 REQUIRED)
 
-add_library(mvplayer)
-add_library(multithreaded)
+add_library(mvplayer SHARED)
+add_library(multithreaded SHARED)
 
 target_sources(
   mvplayer
@@ -87,6 +87,9 @@ target_sources(
 
 target_compile_features(mvplayer PRIVATE cxx_std_23)
 target_compile_features(multithreaded PRIVATE cxx_std_23)
+
+set_target_properties(mvplayer PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+set_target_properties(multithreaded PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 
 target_link_libraries(multithreaded PUBLIC spdlog::spdlog)
 target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog SDL3::SDL3 multithreaded CLI11::CLI11)
