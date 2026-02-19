@@ -8,6 +8,8 @@
 #include <SDL3/SDL_timer.h>
 
 #include <functional>
+
+#include "utils/constants.hpp"
 extern "C" {
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
@@ -302,6 +304,7 @@ void frame_renderer::event_listener() noexcept {
         }
       }
     }
+    std::this_thread::sleep_for(constants::POLL_INTERVAL);
   }
 }
 
