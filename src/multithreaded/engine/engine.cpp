@@ -4,6 +4,7 @@
 #include <variant>
 
 #include "processor/any.hpp"
+#include "utils/constants.hpp"
 
 namespace multithreaded {
 
@@ -29,10 +30,8 @@ void engine::start(std::span<char* const> args) noexcept {
     for (auto& system_event_port : system_event_read_ports_) {
       std::variant<system_events::system_terminate_request_event>
           system_event_holder;
-      if (!system_event_port.pop(system_event_holder)) {
-        continue;
-      }
-      if (std::holds_alternative<system_events::system_terminate_request_event>(
+      if (system_event_port.pop(system_event_holder) &&
+          std::holds_alternative<system_events::system_terminate_request_event>(
               system_event_holder)) {
         spdlog::info(
             "Received terminate request. Sending terminate signal to all "
@@ -44,6 +43,7 @@ void engine::start(std::span<char* const> args) noexcept {
         is_terminated_.store(true, std::memory_order_relaxed);
         break;
       }
+      std::this_thread::sleep_for(constants::SYSTEM_SIGNAL_POLL_INTERVAL);
     }
   }
 }
