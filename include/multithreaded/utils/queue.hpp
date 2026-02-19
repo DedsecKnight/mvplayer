@@ -45,20 +45,7 @@ class spsc_queue {
       if (wait_time_ms >= queue_details::DEFAULT_WAIT_TIME_MS) {
         return false;
       }
-      auto target_time_ms =
-          wait_time_ms +
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::high_resolution_clock::now().time_since_epoch())
-              .count();
-      while (true) {
-        auto current_time_ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::high_resolution_clock::now().time_since_epoch())
-                .count();
-        if (current_time_ms >= target_time_ms) {
-          break;
-        }
-      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(wait_time_ms));
       wait_time_ms *= 2;
     }
 
@@ -76,7 +63,7 @@ class spsc_queue {
   [[nodiscard]] bool pop(T& elem) noexcept {
     auto current_read_index = read_index_.load(std::memory_order_relaxed);
     if (current_read_index == write_index_.load(std::memory_order_acquire)) {
-      spdlog::trace("Queue is empty");
+      SPDLOG_TRACE("Queue is empty");
       return false;
     }
 
