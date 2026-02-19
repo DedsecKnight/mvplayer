@@ -1,7 +1,6 @@
 #pragma once
 
 #include <queue>
-#include <unordered_set>
 #include <variant>
 
 #include "connector/read/event_port.hpp"
@@ -25,31 +24,43 @@ class any {
     bool event_fetcher(std::variant<processor_event_ts...>& event_holder,
                        event_t event) {
       using processor_event_t = std::decay_t<event_t>;
+      namespace ranges = std::ranges;
+
       std::string_view type_id{typeid(processor_event_t).name()};
-      if (invalid_types_.contains(type_id)) {
+
+      if (ranges::find(invalid_types_, type_id) != std::cend(invalid_types_)) {
         return false;
       }
-      bool port_cached = casted_port_mapper_.contains(type_id);
+
+      const auto port_it = ranges::find_if(
+          casted_port_mapper_,
+          [&type_id](const auto& port) { return port.first == type_id; });
+      bool port_cached = port_it != std::cend(casted_port_mapper_);
       auto event_port_ptr =
-          port_cached ? casted_port_mapper_[type_id]
-                            ->as_event_port_of<event_port<processor_event_t>>()
-                      : dynamic_cast<event_port<processor_event_t>*>(this);
+          port_cached
+              ? port_it->second
+                    ->template as_event_port_of<event_port<processor_event_t>>()
+              : dynamic_cast<event_port<processor_event_t>*>(this);
+
       if (!event_port_ptr) {
-        invalid_types_.insert(type_id);
+        invalid_types_.push_back(type_id);
         return false;
       }
+
       if (!port_cached) {
-        casted_port_mapper_.emplace(type_id, event_port_ptr);
+        casted_port_mapper_.emplace_back(type_id, event_port_ptr);
       }
+
       if (!event_port_ptr->get_event(event)) {
         return false;
       }
-      event_holder = event;
+
+      event_holder = std::move(event);
       return true;
     }
 
-    std::unordered_set<std::string_view> invalid_types_;
-    std::unordered_map<std::string_view, event_port_wrapper*>
+    std::vector<std::string_view> invalid_types_;
+    std::vector<std::pair<std::string_view, event_port_wrapper*>>
         casted_port_mapper_;
   };
 
@@ -64,7 +75,7 @@ class any {
     [[nodiscard]] bool pop(event_t& elem) noexcept {
       if (!pending_queue_.empty() &&
           std::holds_alternative<event_t>(pending_queue_.front())) {
-        elem = std::get<event_t>(pending_queue_.front());
+        elem = std::move(std::get<event_t>(pending_queue_.front()));
         pending_queue_.pop();
         return true;
       }
@@ -73,7 +84,7 @@ class any {
         return false;
       }
       if (std::holds_alternative<event_t>(queue_element)) {
-        elem = std::get<event_t>(queue_element);
+        elem = std::move(std::get<event_t>(queue_element));
         return true;
       }
       pending_queue_.emplace(std::move(queue_element));

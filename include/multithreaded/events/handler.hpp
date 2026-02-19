@@ -1,6 +1,7 @@
 #pragma once
 
-#include <unordered_map>
+#include <algorithm>
+#include <functional>
 #include <variant>
 
 #include "connector/read/any.hpp"
@@ -23,13 +24,13 @@ class any_handler {
   template <typename... event_ts>
   void add_read_port(std::string_view sender_name,
                      read::port<event_ts...>&& read_port) {
-    input_queue_.emplace(sender_name, std::move(read_port));
+    input_queue_.emplace_back(sender_name, std::move(read_port));
   }
 
   template <typename... event_ts>
   void add_write_port(std::string_view recipient_name,
                       write::port<event_ts...>&& write_port) {
-    output_queue_.emplace(recipient_name, std::move(write_port));
+    output_queue_.emplace_back(recipient_name, std::move(write_port));
   }
 
   [[nodiscard]] auto input_queues() noexcept { return std::ref(input_queue_); }
@@ -41,21 +42,27 @@ class any_handler {
   void broadcast(const event_t& event) noexcept {
     for (auto&& [recipient_name, write_port] : output_queue_) {
       if (write_port.send_event(event)) {
-        spdlog::trace("Sucessfully sent event to {}", recipient_name);
+        SPDLOG_TRACE("Sucessfully sent event to {}", recipient_name);
       }
     }
   }
 
   [[nodiscard]] bool request_termination() noexcept {
-    return output_queue_.at(constants::ENGINE_IDENTIFIER)
-        .send_event(system_events::system_terminate_request_event{});
+    return std::ranges::all_of(
+        output_queue_ | std::views::filter([](auto& port) {
+          return port.first == constants::ENGINE_IDENTIFIER;
+        }),
+        [](auto& queue) {
+          return queue.second.send_event(
+              system_events::system_terminate_request_event{});
+        });
   }
 
   virtual ~any_handler() = default;
 
  private:
-  std::unordered_map<std::string_view, read::any> input_queue_;
-  std::unordered_map<std::string_view, write::any> output_queue_;
+  std::vector<std::pair<std::string_view, read::any>> input_queue_;
+  std::vector<std::pair<std::string_view, write::any>> output_queue_;
 };
 
 template <typename event_t>

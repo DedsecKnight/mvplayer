@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <concepts>
+#include <ranges>
 #include <span>
 #include <string_view>
 
@@ -61,11 +62,30 @@ class any {
     }
 
     void start_event_loop(std::span<char* const> args) noexcept override {
-      processor_.on_startup(args);
       using envelope_generator_t =
           typename processor_t::enveloped_event_generator_t;
       using event_holder_t = typename processor_t::event_receiver_t;
+      namespace ranges = std::ranges;
+
+      processor_.on_startup(args);
       event_holder_t event_holder;
+
+      std::vector<envelope_generator_t> sender_mailboxes;
+
+      auto& output_queues = processor_.output_queues().get();
+      auto& input_queues = processor_.input_queues().get();
+
+      for (auto&& [sender_name, rp] : input_queues) {
+        write::any* mailbox{nullptr};
+        auto queue_it =
+            ranges::find_if(output_queues, [&sender_name](const auto& port) {
+              return port.first == sender_name;
+            });
+        if (queue_it != output_queues.end()) {
+          mailbox = &queue_it->second;
+        }
+        sender_mailboxes.emplace_back(sender_name, mailbox);
+      }
 
       while (!terminated_.load(std::memory_order_acquire)) {
         if constexpr (std::is_base_of_v<processor::interruptible_processor,
@@ -76,19 +96,14 @@ class any {
             }
           }
         }
-        auto& output_queues = processor_.output_queues().get();
-        for (auto&& [sender_name, rp] : processor_.input_queues().get()) {
-          write::any* sender_mailbox{nullptr};
-          auto it = output_queues.find(sender_name);  // NOLINT
-          if (it != output_queues.end()) {
-            sender_mailbox = &it->second;
-          }
-          envelope_generator_t envelope_generator{sender_name, sender_mailbox};
-          if (rp.get_event(event_holder)) {
-            std::visit(envelope_generator, event_holder);
-            std::visit(processor_, envelope_generator.get_enveloped_event());
+        for (auto&& [input_queue, sender_mailbox] :
+             std::views::zip(input_queues, sender_mailboxes)) {
+          if (input_queue.second.get_event(event_holder)) {
+            std::visit(sender_mailbox, event_holder);
+            std::visit(processor_, sender_mailbox.get_enveloped_event());
           }
         }
+        std::this_thread::yield();
       }
     }
 
