@@ -11,6 +11,7 @@
 #include "connector/write/port.hpp"
 #include "processor/interruptible.hpp"
 #include "processor/termination_handler.hpp"
+#include "utils/constants.hpp"
 
 namespace multithreaded::processor {
 
@@ -94,6 +95,7 @@ class any {
             if (terminated_.load(std::memory_order_acquire)) {
               return;
             }
+            std::this_thread::yield();
           }
         }
         for (auto&& [input_queue, sender_mailbox] :
@@ -103,7 +105,7 @@ class any {
             std::visit(processor_, sender_mailbox.get_enveloped_event());
           }
         }
-        std::this_thread::yield();
+        std::this_thread::sleep_for(constants::EVENT_POLL_INTERVAL);
       }
     }
 
