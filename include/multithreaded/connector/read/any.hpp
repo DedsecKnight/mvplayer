@@ -1,6 +1,7 @@
 #pragma once
 
 #include <queue>
+#include <typeindex>
 #include <variant>
 
 #include "connector/read/event_port.hpp"
@@ -26,7 +27,7 @@ class any {
       using processor_event_t = std::decay_t<event_t>;
       namespace ranges = std::ranges;
 
-      std::string_view type_id{typeid(processor_event_t).name()};
+      std::type_index type_id{typeid(processor_event_t)};
 
       if (ranges::find(invalid_types_, type_id) != std::cend(invalid_types_)) {
         return false;
@@ -59,8 +60,8 @@ class any {
       return true;
     }
 
-    std::vector<std::string_view> invalid_types_;
-    std::vector<std::pair<std::string_view, event_port_wrapper*>>
+    std::vector<std::type_index> invalid_types_;
+    std::vector<std::pair<std::type_index, event_port_wrapper*>>
         casted_port_mapper_;
   };
 
