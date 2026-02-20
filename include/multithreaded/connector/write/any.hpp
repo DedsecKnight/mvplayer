@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include <unordered_set>
+#include <typeindex>
 
 #include "connector/write/event_port.hpp"
 #include "port.hpp"
@@ -15,29 +15,34 @@ class any {
 
     template <typename event_t>
     [[nodiscard]] constexpr bool send_event(const event_t& event) noexcept {
-      std::string_view type_id{typeid(event_t).name()};
-      if (invalid_types_.contains(type_id)) {
+      namespace ranges = std::ranges;
+      std::type_index type_id{typeid(event_t)};
+      if (ranges::find(invalid_types_, type_id) != std::cend(invalid_types_)) {
         return false;
       }
-      bool port_cached = casted_port_mapper_.contains(type_id);
-      auto event_port_ptr = port_cached
-                                ? casted_port_mapper_[type_id]
-                                      ->as_event_port_of<event_port<event_t>>()
-                                : dynamic_cast<event_port<event_t>*>(this);
+
+      const auto port_it = ranges::find_if(
+          casted_port_mapper_,
+          [&type_id](const auto& port) { return port.first == type_id; });
+      bool port_cached = port_it != std::cend(casted_port_mapper_);
+      auto event_port_ptr =
+          port_cached ? port_it->second
+                            ->template as_event_port_of<event_port<event_t>>()
+                      : dynamic_cast<event_port<event_t>*>(this);
       if (!event_port_ptr) {
-        invalid_types_.insert(type_id);
+        invalid_types_.push_back(type_id);
         return false;
       }
       if (!port_cached) {
-        casted_port_mapper_.emplace(type_id, event_port_ptr);
+        casted_port_mapper_.emplace_back(type_id, event_port_ptr);
       }
       return event_port_ptr->send_event(event);
     }
 
    private:
-    std::unordered_map<std::string_view, event_port_wrapper*>
+    std::vector<std::pair<std::type_index, event_port_wrapper*>>
         casted_port_mapper_;
-    std::unordered_set<std::string_view> invalid_types_;
+    std::vector<std::type_index> invalid_types_;
   };
 
   template <typename... event_ts>
