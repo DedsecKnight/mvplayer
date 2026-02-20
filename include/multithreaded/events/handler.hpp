@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <functional>
 #include <variant>
+#include <ranges>
 
 #include "connector/read/any.hpp"
 #include "connector/write/any.hpp"
