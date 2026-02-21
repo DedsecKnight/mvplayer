@@ -65,7 +65,7 @@ class audio_renderer
 
  private:
   [[nodiscard]] std::span<uint8_t> generate_audio_buffer(
-      AVFrame* frame, int num_channels) noexcept;
+      AVFrame* frame, int32_t num_channels) noexcept;
   [[nodiscard]] std::span<uint8_t> generate_packed_planar_sample(
       AVFrame* frame, int32_t num_channels) noexcept;
   [[nodiscard]] std::span<uint8_t> generate_non_planar_sample(
