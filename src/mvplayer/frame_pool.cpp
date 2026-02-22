@@ -1,6 +1,8 @@
 #include "frame_pool.hpp"
 
+extern "C" {
 #include <libavutil/error.h>
+}
 
 #include <cerrno>
 

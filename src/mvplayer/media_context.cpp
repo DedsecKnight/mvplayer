@@ -1,7 +1,9 @@
 #include "media_context.hpp"
 
+extern "C" {
 #include <libavutil/avutil.h>
 #include <libavutil/mathematics.h>
+}
 
 #include <atomic>
 #include <stdexcept>
