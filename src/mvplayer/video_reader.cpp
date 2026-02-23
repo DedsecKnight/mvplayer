@@ -236,7 +236,7 @@ void video_reader::operator()(const seek_request_event& event) {
   }
 }
 
-void video_reader::decode_video() noexcept {
+void video_reader::decode_video() {
   av_packet packet{av_packet_alloc()};
 
   std::array<media_context*, 2> media_contexts{&frame_ctx_, &audio_ctx_};

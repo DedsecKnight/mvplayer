@@ -92,7 +92,7 @@ class engine {
 
  private:
   template <typename... event_ts>
-  [[nodiscard]] decltype(auto) create_connector(size_t queue_size) noexcept {
+  [[nodiscard]] decltype(auto) create_connector(size_t queue_size) {
     connectors_.emplace_back(connector_event_set<event_ts...>{}, queue_size);
     auto& event_connector = connectors_.back().as_connector_of<event_ts...>();
     return std::make_pair(event_connector.get_read_port(),

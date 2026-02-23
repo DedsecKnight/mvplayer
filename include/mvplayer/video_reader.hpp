@@ -72,7 +72,7 @@ class video_reader
   void audio_frame_handler(AVFrame* audio_frame,
                            bool reset_frame_sequence) noexcept;
 
-  void decode_video() noexcept;
+  void decode_video();
 
   AVFormatContext* format_context_ptr_{nullptr};
   media_context frame_ctx_, audio_ctx_;
