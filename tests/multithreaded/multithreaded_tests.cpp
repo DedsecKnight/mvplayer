@@ -7,6 +7,8 @@
 #include "engine/engine.hpp"
 #include "events/envelope.hpp"
 #include "events/handler.hpp"
+#include "processor/pre_event_handler.hpp"
+#include "processor/termination_handler.hpp"
 
 template <typename event_t>
 struct mock_event {
@@ -17,7 +19,9 @@ struct mock_terminate_event {};
 
 struct mock_processor
     : public multithreaded::events::handlers<mock_event<int32_t>,
-                                             mock_terminate_event> {
+                                             mock_terminate_event>,
+      public multithreaded::processor::pre_event_handler,
+      public multithreaded::processor::termination_handler {
   template <typename event_t>
   using envelope = typename multithreaded::events::envelope<event_t>;
 
@@ -34,7 +38,13 @@ struct mock_processor
 
   void on_startup(std::span<char* const>) const noexcept {}
 
-  static bool event_received;
+  void pre_event() noexcept override { pre_event_invoked = true; }
+
+  void handle_termination_signal() noexcept override {
+    termination_handler_invoked = true;
+  }
+
+  static bool event_received, pre_event_invoked, termination_handler_invoked;
   static std::vector<int32_t> received_payload;
   static std::vector<std::string_view> senders;
 };
@@ -60,6 +70,8 @@ struct variadic_mock_processor
 };
 
 bool mock_processor::event_received = false;
+bool mock_processor::pre_event_invoked = false;
+bool mock_processor::termination_handler_invoked = false;
 std::vector<int32_t> mock_processor::received_payload{};
 std::vector<std::string_view> mock_processor::senders{};
 
@@ -321,6 +333,7 @@ TEST(MultithreadedTests, TestBroadcastMechanism) {
 
 TEST(MultithreadedTests, TestRequestTermination) {
   mock_processor::event_received = false;
+  mock_processor::termination_handler_invoked = false;
   mock_processor::received_payload.clear();
   mock_processor::senders.clear();
   multithreaded::engine e{};
@@ -341,4 +354,26 @@ TEST(MultithreadedTests, TestRequestTermination) {
   e.start(args);
   EXPECT_EQ(e.terminated(), true);
   EXPECT_EQ(mock_processor::event_received, true);
+  EXPECT_EQ(mock_processor::termination_handler_invoked, true);
+}
+
+TEST(MultithreadedTests, TestPreEventHandler) {
+  mock_processor::pre_event_invoked = false;
+  multithreaded::engine e{};
+  using namespace std::literals;
+  multithreaded::connector conn{
+      multithreaded::connector_event_set<mock_terminate_event>{}};
+  auto read_port = conn.as_connector_of<mock_terminate_event>().get_read_port();
+  auto write_port =
+      conn.as_connector_of<mock_terminate_event>().get_write_port();
+
+  auto p1 = e.create_processor<mock_processor>("p1");
+  auto& casted_p1 = p1.get().as<mock_processor>();
+  casted_p1.add_read_port("main-thread", std::move(read_port));
+
+  std::vector<char*> args{nullptr};
+  EXPECT_EQ(write_port.push(mock_terminate_event{}), true);
+
+  e.start(args);
+  EXPECT_EQ(mock_processor::pre_event_invoked, true);
 }
