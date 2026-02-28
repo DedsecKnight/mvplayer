@@ -81,15 +81,7 @@ class engine {
                                       std::string_view{it->first}};
   }
 
-  template <typename processor_t, typename... arg_ts>
-    requires std::constructible_from<processor_t, arg_ts...> &&
-             traits::is_event_handler<processor_t>
-  [[nodiscard]] processor_ref<processor_t> create_main_processor(
-      const std::string& processor_name, arg_ts&&... args) noexcept {
-    main_processor_ = processor_name;
-    return create_processor<processor_t, arg_ts...>(
-        processor_name, std::forward<arg_ts>(args)...);
-  }
+  [[nodiscard]] bool pin_to_main_thread(std::string processor_name);
 
   [[nodiscard]] bool terminated() const noexcept {
     return is_terminated_.load(std::memory_order_acquire);

@@ -60,4 +60,14 @@ void engine::start_event_loop() noexcept {
     }
   }
 }
+
+[[nodiscard]] bool engine::pin_to_main_thread(std::string processor_name) {
+  if (!processor_registry_.contains(processor_name)) {
+    spdlog::error("Failed to pin {} to main thread: invalid processor name",
+                  processor_name);
+    return false;
+  }
+  main_processor_ = std::move(processor_name);
+  return true;
+}
 }  // namespace multithreaded
