@@ -10,6 +10,7 @@
 #include "connector/write/any.hpp"
 #include "connector/write/port.hpp"
 #include "processor/interruptible.hpp"
+#include "processor/pre_event_handler.hpp"
 #include "processor/termination_handler.hpp"
 #include "utils/constants.hpp"
 
@@ -89,13 +90,17 @@ class any {
       }
 
       while (!terminated_.load(std::memory_order_acquire)) {
+        if constexpr (std::is_base_of_v<processor::pre_event_handler,
+                                        processor_t>) {
+          processor_.pre_event();
+        }
         if constexpr (std::is_base_of_v<processor::interruptible_processor,
                                         processor_t>) {
-          while (processor_.halt_requested()) {
-            if (terminated_.load(std::memory_order_acquire)) {
-              return;
-            }
-            std::this_thread::yield();
+          if (terminated_.load(std::memory_order_acquire)) {
+            return;
+          }
+          if (processor_.halt_requested()) {
+            continue;
           }
         }
         for (auto&& [input_queue, sender_mailbox] :
