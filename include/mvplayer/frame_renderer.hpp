@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "processor/pre_event_handler.hpp"
+
 extern "C" {
 #include <libswscale/swscale.h>
 }
@@ -16,7 +18,6 @@ extern "C" {
 #include "events/handler.hpp"
 #include "frame_pool.hpp"
 #include "processor/interruptible.hpp"
-#include "processor/termination_handler.hpp"
 #include "utils/constants.hpp"
 #include "utils/owned.hpp"
 
@@ -25,8 +26,8 @@ namespace mvplayer {
 class frame_renderer
     : public multithreaded::events::handlers<events::new_frame_loaded,
                                              events::new_video_loaded>,
-      public multithreaded::processor::termination_handler,
-      public multithreaded::processor::interruptible_processor {
+      public multithreaded::processor::interruptible_processor,
+      public multithreaded::processor::pre_event_handler {
  private:
   using new_frame_loaded_event =
       multithreaded::events::envelope<events::new_frame_loaded>;
@@ -95,12 +96,11 @@ class frame_renderer
   frame_renderer& operator=(frame_renderer&&) noexcept;
 
   void on_startup([[maybe_unused]] std::span<char* const> args) noexcept {}
-  void handle_termination_signal() noexcept override {
-    is_terminated_.store(true, std::memory_order_release);
-  }
   [[nodiscard]] bool halt_requested() const noexcept override {
-    return is_paused_.load(std::memory_order_acquire);
+    return is_paused_;
   }
+
+  void pre_event() noexcept override;
 
   [[nodiscard]] explicit frame_renderer(
       int32_t padding, const std::reference_wrapper<frame_pool>& frame_pool);
@@ -109,11 +109,9 @@ class frame_renderer
   ~frame_renderer() noexcept override;
 
  private:
-  void event_listener() noexcept;
   bool convert_frame(AVFrame* frame) noexcept;
   bool initialize_converted_frame_holder(AVFrame* frame) noexcept;
 
-  std::thread event_listener_;
   sdl_window window_{nullptr};
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
@@ -123,7 +121,8 @@ class frame_renderer
   SDL_FRect render_roi_{};
   SwsContext* conversion_context_{nullptr};
   AVFrame* converted_frame_holder_{nullptr};
+  int64_t stop_counter_{};
   int32_t width_{}, height_{}, padding_{};
-  std::atomic<bool> is_terminated_{false}, is_paused_{false};
+  bool is_paused_{false};
 };
 }  // namespace mvplayer

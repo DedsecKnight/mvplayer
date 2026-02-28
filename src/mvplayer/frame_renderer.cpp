@@ -9,7 +9,6 @@
 
 #include <functional>
 
-#include "utils/constants.hpp"
 extern "C" {
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
@@ -22,7 +21,6 @@ extern "C" {
 #include <atomic>
 #include <chrono>
 #include <format>
-#include <thread>
 
 #include "events.hpp"
 #include "sdl_manager.hpp"
@@ -35,19 +33,16 @@ frame_renderer::frame_renderer(
     : frame_pool_{frame_pool}, padding_{padding} {}
 
 frame_renderer::frame_renderer(frame_renderer&& renderer) noexcept
-    : event_listener_{std::move(renderer.event_listener_)},
-      window_{renderer.window_.release()},
+    : window_{renderer.window_.release()},
       renderer_{renderer.renderer_.release()},
       texture_{renderer.texture_.release()},
       frame_pool_{renderer.frame_pool_},
       playback_state_{std::move(renderer.playback_state_)},
       width_{renderer.width_},
       height_{renderer.height_},
-      padding_{renderer.padding_},
-      is_terminated_{renderer.is_terminated_.load(std::memory_order_acquire)} {}
+      padding_{renderer.padding_} {}
 
 frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
-  event_listener_ = std::move(renderer.event_listener_);
   window_ = sdl_window{renderer.window_.release()};
   renderer_ = sdl_renderer{renderer.renderer_.release()};
   texture_ = sdl_texture{renderer.texture_.release()};
@@ -56,7 +51,6 @@ frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
   width_ = renderer.width_;
   height_ = renderer.height_;
   padding_ = renderer.padding_;
-  is_terminated_ = renderer.is_terminated_.load(std::memory_order_acquire);
   return *this;
 }
 
@@ -112,7 +106,6 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   }
 
   spdlog::trace("SDL Texture created successfully");
-  event_listener_ = std::thread{&frame_renderer::event_listener, this};
 }
 
 bool frame_renderer::initialize_converted_frame_holder(
@@ -252,59 +245,48 @@ frame_renderer::~frame_renderer() noexcept {
   if (conversion_context_ != nullptr) {
     sws_freeContext(conversion_context_);
   }
-  if (event_listener_.joinable()) {
-    event_listener_.join();
-  }
 }
 
-void frame_renderer::event_listener() noexcept {
+void frame_renderer::pre_event() noexcept {
   SDL_Event sdl_event;
-  int64_t stop_counter = 0;
-  while (!is_terminated_.load(std::memory_order_acquire)) {
-    while (SDL_PollEvent(&sdl_event)) {
-      if (sdl_event.type == SDL_EVENT_QUIT) {
-        std::ignore = request_termination();
-        return;
-      }
-      if (sdl_event.type == SDL_EVENT_KEY_DOWN) {
-        switch (sdl_event.key.scancode) {
-          case SDL_SCANCODE_SPACE: {
-            const auto current_ts =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::high_resolution_clock::now()
-                        .time_since_epoch())
-                    .count();
-            const auto paused_status =
-                is_paused_.load(std::memory_order_relaxed);
-            if (!paused_status) {
-              stop_counter -= current_ts;
-            } else {
-              stop_counter += current_ts;
-              playback_state_.extra_time.fetch_add(stop_counter,
-                                                   std::memory_order_acq_rel);
-              stop_counter = 0;
-            }
-            is_paused_.store(!paused_status, std::memory_order_release);
-            broadcast(events::playback_toggled{});
-            break;
+  while (SDL_PollEvent(&sdl_event)) {
+    if (sdl_event.type == SDL_EVENT_QUIT) {
+      std::ignore = request_termination();
+      return;
+    }
+    if (sdl_event.type == SDL_EVENT_KEY_DOWN) {
+      switch (sdl_event.key.scancode) {
+        case SDL_SCANCODE_SPACE: {
+          const auto current_ts =
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::high_resolution_clock::now().time_since_epoch())
+                  .count();
+          if (!is_paused_) {
+            stop_counter_ -= current_ts;
+          } else {
+            stop_counter_ += current_ts;
+            playback_state_.extra_time.fetch_add(stop_counter_,
+                                                 std::memory_order_acq_rel);
+            stop_counter_ = 0;
           }
-          case SDL_SCANCODE_LEFT: {
-            broadcast(
-                events::seek_request{.direction = seek_direction::backward});
-            break;
-          }
-          case SDL_SCANCODE_RIGHT: {
-            broadcast(
-                events::seek_request{.direction = seek_direction::forward});
-            break;
-          }
-          default: {
-            break;
-          }
+          is_paused_ = !is_paused_;
+          broadcast(events::playback_toggled{});
+          break;
+        }
+        case SDL_SCANCODE_LEFT: {
+          broadcast(
+              events::seek_request{.direction = seek_direction::backward});
+          break;
+        }
+        case SDL_SCANCODE_RIGHT: {
+          broadcast(events::seek_request{.direction = seek_direction::forward});
+          break;
+        }
+        default: {
+          break;
         }
       }
     }
-    std::this_thread::sleep_for(constants::POLL_INTERVAL);
   }
 }
 
