@@ -20,6 +20,12 @@ class any {
  private:
   using name_t = std::string_view;
 
+  enum class termination_state : uint8_t {
+    not_terminated,
+    terminating,
+    terminated
+  };
+
   struct container {  // NOLINT
     virtual ~container() = default;
     virtual void start_event_loop(std::span<char* const> args) noexcept = 0;
@@ -34,16 +40,23 @@ class any {
 
    public:
     void terminate() noexcept override {
-      auto* terminate_handler_ptr =
-          dynamic_cast<processor::termination_handler*>(&processor_);
-      if (terminate_handler_ptr != nullptr) {
-        terminate_handler_ptr->handle_termination_signal();
+      if (terminated_.load(std::memory_order_acquire) ==
+          termination_state::terminating) {
+        return;
       }
-      terminated_.store(true, std::memory_order_release);
+      terminated_.store(termination_state::terminating,
+                        std::memory_order_release);
+      if constexpr (std::is_base_of_v<processor::termination_handler,
+                                      processor_t>) {
+        processor_.handle_termination_signal();
+      }
+      terminated_.store(termination_state::terminated,
+                        std::memory_order_release);
     }
 
     [[nodiscard]] bool terminated() const noexcept override {
-      return terminated_.load(std::memory_order_acquire);
+      return terminated_.load(std::memory_order_acquire) ==
+             termination_state::terminated;
     }
 
     template <typename... arg_ts>
@@ -89,14 +102,16 @@ class any {
         sender_mailboxes.emplace_back(sender_name, mailbox);
       }
 
-      while (!terminated_.load(std::memory_order_acquire)) {
+      while (terminated_.load(std::memory_order_acquire) ==
+             termination_state::not_terminated) {
         if constexpr (std::is_base_of_v<processor::pre_event_handler,
                                         processor_t>) {
           processor_.pre_event();
         }
         if constexpr (std::is_base_of_v<processor::interruptible_processor,
                                         processor_t>) {
-          if (terminated_.load(std::memory_order_acquire)) {
+          if (terminated_.load(std::memory_order_acquire) !=
+              termination_state::not_terminated) {
             return;
           }
           if (processor_.halt_requested()) {
@@ -115,7 +130,8 @@ class any {
     }
 
    private:
-    std::atomic<bool> terminated_{false};
+    std::atomic<termination_state> terminated_{
+        termination_state::not_terminated};
     processor_t processor_;
   };
 
