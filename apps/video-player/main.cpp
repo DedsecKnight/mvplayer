@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
   auto video_reader = engine.create_processor<mvplayer::video_reader>(
       "video-reader", std::ref(picture_frame_pool), std::ref(audio_frame_pool));
 
-  auto frame_renderer = engine.create_processor<mvplayer::frame_renderer>(
+  auto frame_renderer = engine.create_main_processor<mvplayer::frame_renderer>(
       "frame-renderer", padding, std::ref(picture_frame_pool));
 
   auto audio_renderer = engine.create_processor<mvplayer::audio_renderer>(

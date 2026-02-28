@@ -81,6 +81,16 @@ class engine {
                                       std::string_view{it->first}};
   }
 
+  template <typename processor_t, typename... arg_ts>
+    requires std::constructible_from<processor_t, arg_ts...> &&
+             traits::is_event_handler<processor_t>
+  [[nodiscard]] processor_ref<processor_t> create_main_processor(
+      const std::string& processor_name, arg_ts&&... args) noexcept {
+    main_processor_ = processor_name;
+    return create_processor<processor_t, arg_ts...>(
+        processor_name, std::forward<arg_ts>(args)...);
+  }
+
   [[nodiscard]] bool terminated() const noexcept {
     return is_terminated_.load(std::memory_order_acquire);
   }
@@ -109,11 +119,14 @@ class engine {
                                                std::move(write_port));
   }
 
+  void start_event_loop() noexcept;
+
   std::vector<std::thread> processor_threads_;
   std::unordered_map<std::string, processor::any> processor_registry_;
   std::vector<connector> connectors_;
   std::vector<read::port<system_events::system_terminate_request_event>>
       system_event_read_ports_;
+  std::optional<std::string> main_processor_{std::nullopt};
   std::atomic<bool> is_terminated_{false};
 };
 }  // namespace multithreaded
