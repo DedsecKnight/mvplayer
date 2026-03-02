@@ -2,6 +2,7 @@
 #include "engine/engine.hpp"
 #include "events.hpp"
 #include "frame_renderer.hpp"
+#include "sdl_manager.hpp"
 #include "video_reader.hpp"
 
 int main(int argc, char** argv) {
@@ -9,6 +10,9 @@ int main(int argc, char** argv) {
 
   constexpr size_t picture_frame_queue_size = 7;
   constexpr size_t audio_frame_queue_size = 31;
+
+  // Add this line to ensure that SDL_Init is invoked in the main thread
+  std::ignore = mvplayer::sdl_manager::get_instance();
 
   mvplayer::frame_pool picture_frame_pool{(picture_frame_queue_size * 2) + 1};
   mvplayer::frame_pool audio_frame_pool{(audio_frame_queue_size * 2) + 1};
