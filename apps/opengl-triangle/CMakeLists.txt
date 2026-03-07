@@ -1,7 +1,7 @@
 add_executable(opengl_triangle)
 
 target_sources(opengl_triangle PRIVATE main.cpp)
-target_link_libraries(opengl_triangle PRIVATE SDL3::SDL3 glad::glad)
+target_link_libraries(opengl_triangle PRIVATE opengl SDL3::SDL3 stb::stb)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(RUNTIME_DIRS "$<TARGET_RUNTIME_DLLS:opengl_triangle>")
