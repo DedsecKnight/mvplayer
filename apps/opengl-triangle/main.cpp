@@ -1,79 +1,63 @@
 // clang-format off
 #include <glad/gl.h>
 #include <SDL3/SDL.h>
+#include "texture.hpp"
 // clang-format on
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
-#include <expected>
 #include <print>
 #include <vector>
 
-using namespace std::string_literals;
+#include "shader.hpp"
+#include "vertex_array.hpp"
+#include "vertex_buffer.hpp"
 
 static constexpr int WIDTH = 800;
 static constexpr int HEIGHT = 600;
 
-static constexpr const char* VERTEX_SHADER = R"(
-#version 330 core
-layout (location = 0) in vec3 v_pos;
+struct vertex_shader_spec {
+  static constexpr const int32_t type = GL_VERTEX_SHADER;
+  static constexpr const char* source = R"(
+    #version 430 core
+    layout (location = 0) in vec3 v_pos;
+    layout (location = 1) in vec2 tex_pos;
 
-void main() {
-  gl_Position = vec4(v_pos.x, v_pos.y, v_pos.z, 1.0);
-}
-)";
+    out vec2 tex_coord;
 
-static constexpr const char* FRAGMENT_SHADER = R"(
-#version 330 core
-out vec4 pixel_color;
+    void main() {
+      gl_Position = vec4(v_pos.x, v_pos.y, v_pos.z, 1.0);
+      tex_coord = tex_pos;
+    }
+  )";
+};
 
-void main() {
-  pixel_color = vec4(1.0f, 0.5f, 0.2f, 1.0f);
-}
-)";
+struct fragment_shader_spec {
+  static constexpr int32_t type = GL_FRAGMENT_SHADER;
+  static constexpr const char* source = R"(
+    #version 430 core
+    in vec2 tex_coord;
+    out vec4 pixel_color;
 
-namespace {
-std::expected<int, std::string> get_shader_compile_status(uint32_t shader) {
-  int success{};
-  const size_t max_log_size = 512;
-  std::vector<char> info_log(max_log_size);
-  glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-  if (success == 0) {
-    glGetShaderInfoLog(shader, static_cast<int>(info_log.size()), nullptr,
-                       info_log.data());
-    return std::unexpected(std::string{info_log.data()});
-  }
-  return success;
-}
+    uniform sampler2D image_texture;
 
-uint32_t create_shader(int shader_type, const char* shader_source) {
-  auto shader = glCreateShader(shader_type);
-  glShaderSource(shader, 1, &shader_source, nullptr);
-  glCompileShader(shader);
-
-  if (auto compile_status = get_shader_compile_status(shader);
-      !compile_status.has_value()) {
-    std::println("Error compiling shader: {}", compile_status.error());
-    return -1;
-  }
-
-  return shader;
-}
-}  // namespace
+    void main() {
+      pixel_color = texture(image_texture, tex_coord);
+    }
+  )";
+};
 
 int main() {
   SDL_Init(SDL_INIT_VIDEO);
 
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
-  SDL_Window* window{nullptr};
-  SDL_Renderer* renderer{nullptr};
-
-  SDL_CreateWindowAndRenderer(
+  auto* window = SDL_CreateWindow(
       "GL with SDL3", WIDTH, HEIGHT,
-      SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS, &window,
-      &renderer);
+      SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS);
 
   SDL_GLContext context = SDL_GL_CreateContext(window);
 
@@ -81,34 +65,40 @@ int main() {
   std::println("GL {}.{}", GLAD_VERSION_MAJOR(version),
                GLAD_VERSION_MINOR(version));
 
-  const std::vector<float> vertices{-0.5F, -0.5F, 0.0F, 0.5F, -0.5F,
-                                    0.0F,  0.0F,  0.5F, 0.0F};
+  const std::vector<float> vertices{-0.5F, -0.5F, 0.0F, 0.0F, 0.0F,
+                                    0.5F,  -0.5F, 0.0F, 1.0F, 0.0F,
+                                    0.0F,  0.5F,  0.0F, 0.5F, 1.0F};
+  const std::vector<opengl::vertex_attribute_spec> attributes{
+      {.component_size = 3,
+       .data_type = GL_FLOAT,
+       .normalized = GL_FALSE,
+       .stride = 5 * sizeof(float),
+       .offset = nullptr},
+      {.component_size = 2,
+       .data_type = GL_FLOAT,
+       .normalized = GL_FALSE,
+       .stride = 5 * sizeof(float),
+       .offset = reinterpret_cast<void*>(3 * sizeof(float))}};  // NOLINT
 
-  uint32_t vertex_array_object{};
-  uint32_t vertex_buffer_object{};
-  glGenVertexArrays(1, &vertex_array_object);
-  glGenBuffers(1, &vertex_buffer_object);
+  int32_t width{};
+  int32_t height{};
+  int32_t num_channels{};
+  uint8_t* pixel_data = stbi_load("apps/opengl-triangle/container.jpg", &width,
+                                  &height, &num_channels, 0);
 
-  glBindVertexArray(vertex_array_object);
+  opengl::vertex_buffer vbo{vertices};
+  opengl::vertex_array vao{attributes};
+  std::span<uint8_t> pixel_data_view{
+      pixel_data,
+      pixel_data + (sizeof(uint8_t) * width * height * num_channels)};
 
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
-  glBufferData(GL_ARRAY_BUFFER,
-               static_cast<int64_t>(vertices.size() * sizeof(float)),
-               vertices.data(), GL_STATIC_DRAW);
+  opengl::texture texture{pixel_data_view,
+                          GL_RGB,
+                          {.width = width, .height = height, .padding = 0}};
+  stbi_image_free(pixel_data);
 
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
-                        static_cast<void*>(0));
-  glEnableVertexAttribArray(0);
-
-  auto vertex_shader = ::create_shader(GL_VERTEX_SHADER, VERTEX_SHADER);
-  auto fragment_shader = ::create_shader(GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
-
-  auto shader_program = glCreateProgram();
-  glAttachShader(shader_program, vertex_shader);
-  glAttachShader(shader_program, fragment_shader);
-  glLinkProgram(shader_program);
-  glDeleteShader(vertex_shader);
-  glDeleteShader(fragment_shader);
+  opengl::shader shader_program{vertex_shader_spec{}, fragment_shader_spec{}};
+  shader_program.use();
 
   bool exit = false;
   while (!exit) {
@@ -131,23 +121,16 @@ int main() {
       }
     }
 
-    glClearColor(0.2F, 0.3F, 0.3F, 1.0F);
+    glClearColor(0.2F, 0.3F, 0.3F, 1.0F);  // NOLINT
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(shader_program);
-    glBindVertexArray(vertex_array_object);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     SDL_GL_SwapWindow(window);
     SDL_Delay(1);
   }
 
-  glDeleteVertexArrays(1, &vertex_array_object);
-  glDeleteBuffers(1, &vertex_buffer_object);
-  glDeleteProgram(shader_program);
-
   SDL_GL_DestroyContext(context);
-  SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
 
   return 0;

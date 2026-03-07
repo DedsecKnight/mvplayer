@@ -36,9 +36,31 @@ find_package(spdlog REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(CLI11 REQUIRED)
 find_package(glad REQUIRED)
+find_package(stb REQUIRED)
 
 add_library(mvplayer SHARED)
 add_library(multithreaded SHARED)
+add_library(opengl SHARED)
+
+target_sources(
+  opengl
+  PRIVATE
+    src/opengl/shader.cpp
+    src/opengl/vertex_buffer.cpp
+    src/opengl/vertex_array.cpp
+    src/opengl/texture.cpp
+
+  PUBLIC
+    FILE_SET openglHeaders
+    TYPE HEADERS
+    BASE_DIRS
+      include/opengl
+    FILES
+      include/opengl/shader.hpp
+      include/opengl/vertex_array.hpp
+      include/opengl/vertex_buffer.hpp
+      include/opengl/texture.hpp
+)
 
 target_sources(
   mvplayer
@@ -94,6 +116,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set_target_properties(multithreaded PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 endif()
 
+target_link_libraries(opengl PUBLIC glad::glad)
 target_link_libraries(multithreaded PUBLIC spdlog::spdlog)
 target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog SDL3::SDL3 multithreaded CLI11::CLI11)
 

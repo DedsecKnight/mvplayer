@@ -15,6 +15,7 @@ class VideoPlayerRecipe(ConanFile):
         self.requires("sdl/3.4.0")
         self.requires("gtest/1.17.0")
         self.requires("glad/2.0.8")
+        self.requires("stb/cci.20240531")
 
     def configure(self):
         self.options["ffmpeg"].with_pulse = False
