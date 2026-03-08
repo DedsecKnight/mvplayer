@@ -49,6 +49,7 @@ target_sources(
     src/opengl/vertex_buffer.cpp
     src/opengl/vertex_array.cpp
     src/opengl/texture.cpp
+    src/opengl/index_buffer.cpp
 
   PUBLIC
     FILE_SET openglHeaders
@@ -60,6 +61,7 @@ target_sources(
       include/opengl/vertex_array.hpp
       include/opengl/vertex_buffer.hpp
       include/opengl/texture.hpp
+      include/opengl/index_buffer.hpp
 )
 
 target_sources(

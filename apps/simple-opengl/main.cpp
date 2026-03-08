@@ -1,6 +1,7 @@
 // clang-format off
 #include <glad/gl.h>
 #include <SDL3/SDL.h>
+#include "index_buffer.hpp"
 #include "texture.hpp"
 // clang-format on
 #define STB_IMAGE_IMPLEMENTATION
@@ -65,9 +66,10 @@ int main() {
   std::println("GL {}.{}", GLAD_VERSION_MAJOR(version),
                GLAD_VERSION_MINOR(version));
 
-  const std::vector<float> vertices{-0.5F, -0.5F, 0.0F, 0.0F, 0.0F,
-                                    0.5F,  -0.5F, 0.0F, 1.0F, 0.0F,
-                                    0.0F,  0.5F,  0.0F, 0.5F, 1.0F};
+  const std::vector<float> vertices{-0.5F, -0.5F, 0.0F, 0.0F, 0.0F, 0.5F, -0.5F,
+                                    0.0F,  1.0F,  0.0F, 0.5F, 0.5F, 0.0F, 1.0F,
+                                    1.0F,  -0.5F, 0.5F, 0.0F, 0.0F, 1.0F};
+  const std::vector<uint32_t> indices{0, 1, 2, 0, 2, 3};
   const std::vector<opengl::vertex_attribute_spec> attributes{
       {.component_size = 3,
        .data_type = GL_FLOAT,
@@ -83,11 +85,12 @@ int main() {
   int32_t width{};
   int32_t height{};
   int32_t num_channels{};
-  uint8_t* pixel_data = stbi_load("apps/opengl-triangle/container.jpg", &width,
+  uint8_t* pixel_data = stbi_load("apps/simple-opengl/container.jpg", &width,
                                   &height, &num_channels, 0);
 
   opengl::vertex_buffer vbo{vertices};
   opengl::vertex_array vao{attributes};
+  opengl::index_buffer ibo{indices};
   std::span<uint8_t> pixel_data_view{
       pixel_data,
       pixel_data + (sizeof(uint8_t) * width * height * num_channels)};
@@ -124,7 +127,9 @@ int main() {
     glClearColor(0.2F, 0.3F, 0.3F, 1.0F);  // NOLINT
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    vao.bind();
+    glDrawElements(GL_TRIANGLES, static_cast<int32_t>(indices.size()),
+                   GL_UNSIGNED_INT, nullptr);
 
     SDL_GL_SwapWindow(window);
     SDL_Delay(1);
