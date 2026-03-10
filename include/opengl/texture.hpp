@@ -6,7 +6,7 @@
 namespace opengl {
 
 struct texture_spec {
-  int32_t width, height, padding;
+  int32_t width, height;
 };
 
 class texture {
@@ -15,6 +15,9 @@ class texture {
   texture(std::span<uint8_t> pixel_buffer, GLint pixel_format,
           const texture_spec& spec);
 
+  void configure_texture_data(std::span<uint8_t> pixel_buffer,
+                              GLint pixel_format,
+                              const texture_spec& spec) noexcept;
   void bind(uint32_t slot = 0) const noexcept;
 
   texture(const texture&) = delete;
@@ -29,5 +32,6 @@ class texture {
   void configure_filtering() const noexcept;
 
   GLuint id_{0};
+  bool initialized_{false};
 };
 }  // namespace opengl
