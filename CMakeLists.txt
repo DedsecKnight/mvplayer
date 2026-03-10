@@ -74,6 +74,8 @@ target_sources(
     src/mvplayer/frame_renderer.cpp
     src/mvplayer/audio_renderer.cpp
     src/mvplayer/frame_pool.cpp
+    src/mvplayer/renderer/base.cpp
+    src/mvplayer/renderer/rgb/renderer.cpp
 
   PRIVATE
     FILE_SET vplayerPrivateHeaders
