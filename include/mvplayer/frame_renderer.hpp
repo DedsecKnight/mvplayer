@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_video.h>
 
 #include "processor/pre_event_handler.hpp"
 
@@ -115,6 +116,7 @@ class frame_renderer
   sdl_window window_{nullptr};
   sdl_renderer renderer_{nullptr};
   sdl_texture texture_{nullptr};
+  SDL_GLContext context_{nullptr};
   std::reference_wrapper<frame_pool> frame_pool_;
   video_playback_state playback_state_;
   SDL_Rect frame_roi_{};
