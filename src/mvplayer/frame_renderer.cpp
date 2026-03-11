@@ -1,3 +1,6 @@
+// clang-format off
+#include <glad/gl.h>
+// clang-format on
 #include "frame_renderer.hpp"
 
 #include <SDL3/SDL.h>
@@ -6,6 +9,7 @@
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_timer.h>
+#include <SDL3/SDL_video.h>
 
 #include <functional>
 
@@ -64,6 +68,10 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   int32_t padded_width = width_ + (2 * padding_);
   int32_t padded_height = height_ + (2 * padding_);
 
+  if (window_ != nullptr) {
+    SDL_GL_DestroyContext(context_);
+  }
+
   window_ =
       sdl_manager::create_window("video-player", WINDOW_WIDTH, WINDOW_HEIGHT);
   if (window_ == nullptr) {
@@ -71,6 +79,18 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
         std::format("Error creating window: {}", SDL_GetError())};
   }
   spdlog::trace("SDL Window created successfully");
+
+  context_ = SDL_GL_CreateContext(window_.get());
+  if (context_ == nullptr) {
+    spdlog::error("Error creating OpenGL context: {}", SDL_GetError());
+    std::ignore = request_termination();
+    return;
+  }
+
+  const auto gl_version =
+      gladLoadGL(static_cast<GLADloadfunc>(SDL_GL_GetProcAddress));
+  spdlog::info("Initialized OpenGL with version {}.{}",
+               GLAD_VERSION_MAJOR(gl_version), GLAD_VERSION_MINOR(gl_version));
 
   renderer_ = sdl_manager::create_renderer(window_.get());
   if (renderer_ == nullptr) {
@@ -244,6 +264,9 @@ frame_renderer::~frame_renderer() noexcept {
   }
   if (conversion_context_ != nullptr) {
     sws_freeContext(conversion_context_);
+  }
+  if (context_ != nullptr) {
+    SDL_GL_DestroyContext(context_);
   }
 }
 
