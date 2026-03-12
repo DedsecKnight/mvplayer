@@ -19,6 +19,7 @@ extern "C" {
 #include "events/handler.hpp"
 #include "frame_pool.hpp"
 #include "processor/interruptible.hpp"
+#include "renderer/base.hpp"
 #include "utils/constants.hpp"
 #include "utils/owned.hpp"
 
@@ -35,7 +36,7 @@ class frame_renderer
   using new_video_loaded_event =
       multithreaded::events::envelope<events::new_video_loaded>;
   static constexpr AVPixelFormat SUPPORTED_FORMAT =
-      AVPixelFormat::AV_PIX_FMT_YUV420P;
+      AVPixelFormat::AV_PIX_FMT_RGB24;
   static constexpr int32_t WINDOW_HEIGHT = 1440;
   static constexpr int32_t WINDOW_WIDTH = 2560;
   static constexpr int32_t FRAME_ALLOC_ALIGNMENT = 32;
@@ -112,15 +113,13 @@ class frame_renderer
  private:
   bool convert_frame(AVFrame* frame) noexcept;
   bool initialize_converted_frame_holder(AVFrame* frame) noexcept;
+  void initialize_viewport(int32_t width, int32_t height) const noexcept;
 
   sdl_window window_{nullptr};
-  sdl_renderer renderer_{nullptr};
-  sdl_texture texture_{nullptr};
-  SDL_GLContext context_{nullptr};
+  sdl_gl_context context_{nullptr};
+  std::unique_ptr<renderer::base> renderer_{nullptr};
   std::reference_wrapper<frame_pool> frame_pool_;
   video_playback_state playback_state_;
-  SDL_Rect frame_roi_{};
-  SDL_FRect render_roi_{};
   SwsContext* conversion_context_{nullptr};
   AVFrame* converted_frame_holder_{nullptr};
   int64_t stop_counter_{};

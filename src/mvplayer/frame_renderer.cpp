@@ -27,6 +27,7 @@ extern "C" {
 #include <format>
 
 #include "events.hpp"
+#include "renderer/factory.hpp"
 #include "sdl_manager.hpp"
 #include "utils/owned.hpp"
 
@@ -38,8 +39,6 @@ frame_renderer::frame_renderer(
 
 frame_renderer::frame_renderer(frame_renderer&& renderer) noexcept
     : window_{renderer.window_.release()},
-      renderer_{renderer.renderer_.release()},
-      texture_{renderer.texture_.release()},
       frame_pool_{renderer.frame_pool_},
       playback_state_{std::move(renderer.playback_state_)},
       width_{renderer.width_},
@@ -48,8 +47,6 @@ frame_renderer::frame_renderer(frame_renderer&& renderer) noexcept
 
 frame_renderer& frame_renderer::operator=(frame_renderer&& renderer) noexcept {
   window_ = sdl_window{renderer.window_.release()};
-  renderer_ = sdl_renderer{renderer.renderer_.release()};
-  texture_ = sdl_texture{renderer.texture_.release()};
   frame_pool_ = renderer.frame_pool_;
   playback_state_ = std::move(renderer.playback_state_);
   width_ = renderer.width_;
@@ -65,11 +62,8 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   playback_state_.first_frame_render_ts = 0;
   playback_state_.timebase = event.payload().info.picture.tbn;
 
-  int32_t padded_width = width_ + (2 * padding_);
-  int32_t padded_height = height_ + (2 * padding_);
-
   if (window_ != nullptr) {
-    SDL_GL_DestroyContext(context_);
+    context_.reset(nullptr);
   }
 
   window_ =
@@ -80,7 +74,7 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   }
   spdlog::trace("SDL Window created successfully");
 
-  context_ = SDL_GL_CreateContext(window_.get());
+  context_ = sdl_manager::create_gl_context(window_.get());
   if (context_ == nullptr) {
     spdlog::error("Error creating OpenGL context: {}", SDL_GetError());
     std::ignore = request_termination();
@@ -92,30 +86,7 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   spdlog::info("Initialized OpenGL with version {}.{}",
                GLAD_VERSION_MAJOR(gl_version), GLAD_VERSION_MINOR(gl_version));
 
-  renderer_ = sdl_manager::create_renderer(window_.get());
-  if (renderer_ == nullptr) {
-    throw std::runtime_error{
-        std::format("Error creating renderer: {}", SDL_GetError())};
-  }
-
-  SDL_SetRenderLogicalPresentation(
-      renderer_.get(), padded_width, padded_height,
-      SDL_RendererLogicalPresentation::SDL_LOGICAL_PRESENTATION_LETTERBOX);
-
-  render_roi_ = {.x = static_cast<float>(padding_),
-                 .y = static_cast<float>(padding_),
-                 .w = static_cast<float>(width_),
-                 .h = static_cast<float>(height_)};
-  frame_roi_ = {.x = 0, .y = 0, .w = width_, .h = height_};
-  spdlog::trace("SDL Renderer created successfully");
-
-  texture_ = sdl_manager::create_texture(
-      renderer_.get(), SDL_PixelFormat::SDL_PIXELFORMAT_IYUV,
-      SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING, width_, height_);
-  if (texture_ == nullptr) {
-    throw std::runtime_error{
-        std::format("Error creating texture: {}", SDL_GetError())};
-  }
+  initialize_viewport(width_, height_);
 
   if (converted_frame_holder_ != nullptr) {
     av_freep(static_cast<void*>(&converted_frame_holder_->data[0]));
@@ -126,6 +97,27 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   }
 
   spdlog::trace("SDL Texture created successfully");
+}
+
+void frame_renderer::initialize_viewport(int32_t width,
+                                         int32_t height) const noexcept {
+  int32_t screen_width{};
+  int32_t screen_height{};
+  SDL_GetWindowSize(window_.get(), &screen_width, &screen_height);
+  float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
+
+  int32_t scaled_width = screen_width;
+  auto scaled_height = static_cast<int32_t>(lround(
+      (static_cast<float>(scaled_width) / aspect_ratio) + 0.5F));  // NOLINT
+  if (scaled_height > screen_height) {
+    scaled_height = screen_height;
+    scaled_width = static_cast<int32_t>(lround(
+        (static_cast<float>(scaled_height) * aspect_ratio) + 0.5F));  // NOLINT
+  }
+
+  glViewport((screen_width / 2) - (scaled_width / 2),
+             (screen_height / 2) - (scaled_height / 2), scaled_width,
+             scaled_height);
 }
 
 bool frame_renderer::initialize_converted_frame_holder(
@@ -183,8 +175,10 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     playback_state_.expected_frame_no = event.payload().frame_num;
   }
 
-  SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 0);
-  SDL_RenderClear(renderer_.get());
+  if (renderer_ == nullptr) {
+    renderer_ = renderer::factory::create_renderer_pipeline(
+        static_cast<AVPixelFormat>(SUPPORTED_FORMAT));
+  }
 
   auto* frame = payload.frame;
   bool swap_frame = false;
@@ -197,13 +191,13 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     std::swap(frame, converted_frame_holder_);
     swap_frame = true;
   }
-  if (!SDL_UpdateYUVTexture(texture_.get(), &frame_roi_, frame->data[0],
-                            frame->linesize[0], frame->data[1],
-                            frame->linesize[1], frame->data[2],
-                            frame->linesize[2])) {
-    spdlog::error("Error updating texture: {}", SDL_GetError());
+
+  if (!renderer_->render_frame(frame)) {
+    spdlog::error("error rendering frame");
     std::ignore = event_handler_t::request_termination();
+    return;
   }
+
   if (swap_frame) {
     std::swap(frame, converted_frame_holder_);
   }
@@ -246,12 +240,7 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     spdlog::trace("Slept for {}ms", wait_time.count());
   }
 
-  if (!SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr,
-                         &render_roi_) ||
-      !SDL_RenderPresent(renderer_.get())) {
-    spdlog::error("Error rendering frame: {}", SDL_GetError());
-    std::ignore = event_handler_t::request_termination();
-  }
+  SDL_GL_SwapWindow(window_.get());
 
   playback_state_.expected_frame_no++;
   frame_pool_.get().release_frame(frame);
@@ -264,9 +253,6 @@ frame_renderer::~frame_renderer() noexcept {
   }
   if (conversion_context_ != nullptr) {
     sws_freeContext(conversion_context_);
-  }
-  if (context_ != nullptr) {
-    SDL_GL_DestroyContext(context_);
   }
 }
 
