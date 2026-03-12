@@ -1,8 +1,10 @@
+// clang-format off
+#include "sdl_manager.hpp"
+// clang-format off
 #include "audio_renderer.hpp"
 #include "engine/engine.hpp"
 #include "events.hpp"
 #include "frame_renderer.hpp"
-#include "sdl_manager.hpp"
 #include "video_reader.hpp"
 
 int main(int argc, char** argv) {

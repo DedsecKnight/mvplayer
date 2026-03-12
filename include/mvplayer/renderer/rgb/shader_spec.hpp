@@ -14,7 +14,7 @@ struct vertex_shader_spec {
 
     void main() {
       gl_Position = vec4(v_pos, 1.0);
-      tex_coord = tex_pos;
+      tex_coord = vec2(tex_pos.x, 1.0 - tex_pos.y);
     }
   )";
 };

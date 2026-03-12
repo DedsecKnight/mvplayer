@@ -1,7 +1,13 @@
 #pragma once
 
+// clang-format off
+#include <glad/gl.h>
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+// clang-format on
 #include <SDL3/SDL_audio.h>
+#include <SDL3/SDL_video.h>
+#include <spdlog/spdlog.h>
 
 #include <string>
 
@@ -25,6 +31,11 @@ class sdl_manager {
                                                 int32_t width,
                                                 int32_t height) noexcept {
     return get_instance().new_window(window_name, width, height);
+  }
+
+  [[nodiscard]] static sdl_gl_context create_gl_context(
+      SDL_Window* window) noexcept {
+    return get_instance().new_gl_context(window);
   }
 
   [[nodiscard]] static sdl_audio_stream create_audio_stream(
@@ -52,9 +63,14 @@ class sdl_manager {
   [[nodiscard]] sdl_window new_window(std::string_view window_name,
                                       int32_t width, int32_t height) {
     std::string safe_window_name{window_name};
-    return sdl_window{
-        SDL_CreateWindow(safe_window_name.c_str(), width, height,
-                         SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS)};
+    return sdl_window{SDL_CreateWindow(
+        safe_window_name.c_str(), width, height,
+        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS)};
+  }
+
+  // NOLINTNEXTLINE
+  [[nodiscard]] sdl_gl_context new_gl_context(SDL_Window* window) {
+    return sdl_gl_context{SDL_GL_CreateContext(window)};
   }
 
   // NOLINTNEXTLINE
@@ -82,7 +98,14 @@ class sdl_manager {
                                          width, height)};
   }
 
-  sdl_manager() { SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO); }
+  sdl_manager() {
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+                        SDL_GL_CONTEXT_PROFILE_CORE);
+  }
   ~sdl_manager() { SDL_Quit(); }
 };
 }  // namespace mvplayer

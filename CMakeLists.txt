@@ -123,7 +123,7 @@ endif()
 
 target_link_libraries(opengl PUBLIC glad::glad)
 target_link_libraries(multithreaded PUBLIC spdlog::spdlog)
-target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog SDL3::SDL3 multithreaded CLI11::CLI11)
+target_link_libraries(mvplayer PUBLIC ffmpeg::ffmpeg spdlog::spdlog SDL3::SDL3 multithreaded CLI11::CLI11 opengl)
 
 add_subdirectory(apps)
 add_subdirectory(tests)

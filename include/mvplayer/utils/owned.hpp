@@ -16,6 +16,7 @@ namespace deallocator {
 void AVFrameDeallocator(AVFrame* frame);
 void AVPacketDeallocator(AVPacket* packet);
 void SwrContextDeallocator(SwrContext* ctx);
+void SDLGLContextDeallocator(SDL_GLContextState* ctx);
 }  // namespace deallocator
 
 namespace details {
@@ -57,6 +58,20 @@ OWNED_SDL_RESOURCE(Renderer)
 OWNED_SDL_RESOURCE(Texture)
 OWNED_SDL_RESOURCE(AudioStream)
 }  // namespace details
+
+class sdl_gl_context
+    : public std::unique_ptr<SDL_GLContextState,
+                             decltype(&deallocator::SDLGLContextDeallocator)> {
+ private:
+  using base_type =
+      std::unique_ptr<SDL_GLContextState,
+                      decltype(&deallocator::SDLGLContextDeallocator)>;
+
+ public:
+  using base_type::unique_ptr;
+  [[nodiscard]] explicit sdl_gl_context(SDL_GLContext raw_resource)
+      : base_type{raw_resource, deallocator::SDLGLContextDeallocator} {}
+};
 
 using sdl_window = details::OwnedSdlWindow;
 using sdl_renderer = details::OwnedSdlRenderer;
