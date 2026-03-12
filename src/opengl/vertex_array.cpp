@@ -18,10 +18,12 @@ vertex_array::vertex_array(std::span<const vertex_attribute_spec> attributes)
 }
 
 vertex_array::vertex_array(vertex_array&& vao) noexcept
-    : id_{std::exchange(vao.id_, 0)} {}
+    : id_{std::exchange(vao.id_, 0)},
+      binded_{std::exchange(vao.binded_, false)} {}
 
 vertex_array& vertex_array::operator=(vertex_array&& vao) noexcept {
   id_ = std::exchange(vao.id_, 0);
+  binded_ = std::exchange(vao.binded_, false);
   return *this;
 }
 
