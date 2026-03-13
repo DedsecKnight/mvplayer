@@ -1,8 +1,10 @@
 #pragma once
 
+#include <libavutil/pixfmt.h>
+
 #include "renderer/base.hpp"
 #include "texture.hpp"
-namespace mvplayer::renderer::yuvp8 {
+namespace mvplayer::renderer::yuvp {
 class renderer : public base {
  public:
   renderer();
@@ -18,6 +20,8 @@ class renderer : public base {
   [[nodiscard]] bool render_frame(const AVFrame* frame) noexcept override;
 
  private:
+  static bool pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept;
+
   std::array<opengl::texture, 3> plane_textures_;
 };
-}  // namespace mvplayer::renderer::yuvp8
+}  // namespace mvplayer::renderer::yuvp
