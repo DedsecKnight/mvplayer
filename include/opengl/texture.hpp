@@ -7,16 +7,16 @@ namespace opengl {
 
 struct texture_spec {
   int32_t width, height;
+  GLint internal_format;
+  GLenum format, data_type;
 };
 
 class texture {
  public:
   texture();
-  texture(std::span<uint8_t> pixel_buffer, GLint pixel_format,
-          const texture_spec& spec);
+  texture(std::span<uint8_t> pixel_buffer, const texture_spec& spec);
 
   void configure_texture_data(std::span<uint8_t> pixel_buffer,
-                              GLint pixel_format,
                               const texture_spec& spec) noexcept;
   void bind(uint32_t slot = 0) const noexcept;
 
