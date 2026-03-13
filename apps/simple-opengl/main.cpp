@@ -95,8 +95,12 @@ int main() {
       pixel_data,
       pixel_data + (sizeof(uint8_t) * width * height * num_channels)};
 
-  opengl::texture texture{
-      pixel_data_view, GL_RGB, {.width = width, .height = height}};
+  opengl::texture texture{pixel_data_view,
+                          {.width = width,
+                           .height = height,
+                           .internal_format = GL_RGB,
+                           .format = GL_RGB,
+                           .data_type = GL_UNSIGNED_BYTE}};
   stbi_image_free(pixel_data);
 
   opengl::shader shader_program{vertex_shader_spec{}, fragment_shader_spec{}};

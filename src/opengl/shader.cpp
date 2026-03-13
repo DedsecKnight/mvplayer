@@ -25,6 +25,8 @@ shader::~shader() { glDeleteProgram(id_); }
   return shader_component_id;
 }
 
+[[nodiscard]] GLuint shader::id() const noexcept { return id_; }
+
 shader::shader_creation_result shader::shader_component_compilation_status(
     GLuint component_id) noexcept {
   int32_t success{};

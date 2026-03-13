@@ -54,6 +54,7 @@ class shader {
   }
 
   void use() const noexcept;
+  [[nodiscard]] GLuint id() const noexcept;
 
   shader(const shader&) = delete;
   shader& operator=(const shader&) = delete;

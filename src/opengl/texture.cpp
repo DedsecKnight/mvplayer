@@ -7,10 +7,9 @@
 namespace opengl {
 texture::texture() { glGenTextures(1, &id_); }
 
-texture::texture(std::span<uint8_t> pixel_buffer, GLint pixel_format,
-                 const texture_spec& spec)
+texture::texture(std::span<uint8_t> pixel_buffer, const texture_spec& spec)
     : texture() {
-  configure_texture_data(pixel_buffer, pixel_format, spec);
+  configure_texture_data(pixel_buffer, spec);
 }
 
 void texture::bind(uint32_t slot) const noexcept {
@@ -31,17 +30,17 @@ texture& texture::operator=(texture&& other_texture) noexcept {
 texture::~texture() { glDeleteTextures(1, &id_); }
 
 void texture::configure_texture_data(std::span<uint8_t> pixel_buffer,
-                                     GLint pixel_format,
                                      const texture_spec& spec) noexcept {
   bind();
   if (!initialized_) {
     configure_filtering();
-    glTexImage2D(GL_TEXTURE_2D, 0, pixel_format, spec.width, spec.height, 0,
-                 pixel_format, GL_UNSIGNED_BYTE, pixel_buffer.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, spec.internal_format, spec.width,
+                 spec.height, 0, spec.format, spec.data_type,
+                 pixel_buffer.data());
     initialized_ = true;
   } else {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, spec.width, spec.height,
-                    pixel_format, GL_UNSIGNED_BYTE, pixel_buffer.data());
+                    spec.format, spec.data_type, pixel_buffer.data());
   }
 }
 
