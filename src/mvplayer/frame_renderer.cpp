@@ -121,28 +121,29 @@ void frame_renderer::initialize_viewport(int32_t width,
 }
 
 bool frame_renderer::initialize_converted_frame_holder(
-    AVFrame* frame) noexcept {
+    AVFrame* frame, AVPixelFormat target_format) noexcept {
   converted_frame_holder_ = av_frame_alloc();
   if (converted_frame_holder_ == nullptr) {
     return false;
   }
   if (av_image_alloc(static_cast<uint8_t**>(converted_frame_holder_->data),
                      static_cast<int32_t*>(converted_frame_holder_->linesize),
-                     frame->width, frame->height, SUPPORTED_FORMAT,
+                     frame->width, frame->height, target_format,
                      FRAME_ALLOC_ALIGNMENT) < 0) {
     av_frame_free(&converted_frame_holder_);
     return false;
   }
   converted_frame_holder_->width = frame->width;
   converted_frame_holder_->height = frame->height;
-  converted_frame_holder_->format = SUPPORTED_FORMAT;
+  converted_frame_holder_->format = target_format;
 
   return true;
 }
 
-bool frame_renderer::convert_frame(AVFrame* frame) noexcept {
+bool frame_renderer::convert_frame(AVFrame* frame,
+                                   AVPixelFormat target_format) noexcept {
   if (converted_frame_holder_ == nullptr &&
-      !initialize_converted_frame_holder(frame)) {
+      !initialize_converted_frame_holder(frame, target_format)) {
     return false;
   }
 
@@ -152,7 +153,7 @@ bool frame_renderer::convert_frame(AVFrame* frame) noexcept {
     conversion_context_ = sws_getContext(
         frame->width, frame->height, static_cast<AVPixelFormat>(frame->format),
         converted_frame_holder_->width, converted_frame_holder_->height,
-        SUPPORTED_FORMAT,
+        target_format,
         SWS_FAST_BILINEAR | SWS_FULL_CHR_H_INT | SWS_ACCURATE_RND,  // NOLINT
         nullptr, nullptr, nullptr);
   }
@@ -175,17 +176,33 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     playback_state_.expected_frame_no = event.payload().frame_num;
   }
 
+  auto* frame = payload.frame;
+  const auto source_format = static_cast<AVPixelFormat>(frame->format);
+  const auto gpu_supported_format =
+      renderer::factory::supports_format(source_format);
+
+  const auto target_format =
+      gpu_supported_format ? source_format : FALLBACK_FORMAT;
   if (renderer_ == nullptr) {
-    renderer_ = renderer::factory::create_renderer_pipeline(
-        static_cast<AVPixelFormat>(SUPPORTED_FORMAT));
+    renderer_ = renderer::factory::create_renderer_pipeline(target_format);
+
+    // NOTE: Move logging logic here to ensure that this log is printed out only
+    // once for every video load
+    if (!gpu_supported_format) {
+      spdlog::warn(
+          "GPU colorspace conversion is not supported for {}. Applying "
+          "software "
+          "colorspace conversion to {}",
+          av_get_pix_fmt_name(source_format),
+          av_get_pix_fmt_name(FALLBACK_FORMAT));
+    }
   }
 
-  auto* frame = payload.frame;
   bool swap_frame = false;
-  if (frame->format != SUPPORTED_FORMAT) {
-    if (!convert_frame(frame)) {
+  if (frame->format != target_format) {
+    if (!convert_frame(frame, target_format)) {
       spdlog::error("Error converting frame to {}",
-                    av_get_pix_fmt_name(SUPPORTED_FORMAT));
+                    av_get_pix_fmt_name(target_format));
       std::ignore = request_termination();
     }
     std::swap(frame, converted_frame_holder_);

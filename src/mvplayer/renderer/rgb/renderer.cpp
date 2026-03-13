@@ -19,6 +19,7 @@ renderer::renderer() : base(vertex_shader_spec{}, fragment_shader_spec{}) {}
   texture_.configure_texture_data(
       frame_data_view, GL_RGB,
       {.width = frame->width, .height = frame->height});
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
   draw_frame();
   return true;
 }

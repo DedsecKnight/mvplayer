@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
+#include <libavutil/pixfmt.h>
 
 #include "processor/pre_event_handler.hpp"
 
@@ -35,7 +36,7 @@ class frame_renderer
       multithreaded::events::envelope<events::new_frame_loaded>;
   using new_video_loaded_event =
       multithreaded::events::envelope<events::new_video_loaded>;
-  static constexpr AVPixelFormat SUPPORTED_FORMAT =
+  static constexpr AVPixelFormat FALLBACK_FORMAT =
       AVPixelFormat::AV_PIX_FMT_RGB24;
   static constexpr int32_t WINDOW_HEIGHT = 1440;
   static constexpr int32_t WINDOW_WIDTH = 2560;
@@ -111,8 +112,9 @@ class frame_renderer
   ~frame_renderer() noexcept override;
 
  private:
-  bool convert_frame(AVFrame* frame) noexcept;
-  bool initialize_converted_frame_holder(AVFrame* frame) noexcept;
+  bool convert_frame(AVFrame* frame, AVPixelFormat target_format) noexcept;
+  bool initialize_converted_frame_holder(AVFrame* frame,
+                                         AVPixelFormat target_format) noexcept;
   void initialize_viewport(int32_t width, int32_t height) const noexcept;
 
   sdl_window window_{nullptr};
