@@ -1,7 +1,7 @@
 #pragma once
 
 #include <glad/gl.h>
-namespace mvplayer::renderer::yuvp8 {
+namespace mvplayer::renderer::yuvp {
 struct vertex_shader_spec {
   static constexpr const int32_t type = GL_VERTEX_SHADER;
   static constexpr const char* source = R"(
@@ -29,11 +29,12 @@ struct fragment_shader_spec {
     layout(binding = 0) uniform sampler2D y_texture;
     layout(binding = 1) uniform sampler2D u_texture;
     layout(binding = 2) uniform sampler2D v_texture;
+    uniform float multiplier;
 
     void main() {
-      float y_pixel = texture(y_texture, tex_coord).r;
-      float u_pixel = texture(u_texture, tex_coord).r - 0.5;
-      float v_pixel = texture(v_texture, tex_coord).r - 0.5;
+      float y_pixel = texture(y_texture, tex_coord).r * multiplier;
+      float u_pixel = texture(u_texture, tex_coord).r * multiplier - 0.5;
+      float v_pixel = texture(v_texture, tex_coord).r * multiplier - 0.5;
 
       float r_pixel = y_pixel + 1.402    * v_pixel;
       float g_pixel = y_pixel - 0.344136 * u_pixel - 0.714136 * v_pixel;
@@ -43,4 +44,4 @@ struct fragment_shader_spec {
     }
   )";
 };
-}  // namespace mvplayer::renderer::yuvp8
+}  // namespace mvplayer::renderer::yuvp
