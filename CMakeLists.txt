@@ -76,6 +76,7 @@ target_sources(
     src/mvplayer/frame_pool.cpp
     src/mvplayer/renderer/base.cpp
     src/mvplayer/renderer/rgb/renderer.cpp
+    src/mvplayer/renderer/yuvp8/renderer.cpp
     src/mvplayer/renderer/factory.cpp
 
   PRIVATE
