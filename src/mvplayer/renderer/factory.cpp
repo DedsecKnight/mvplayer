@@ -17,9 +17,11 @@ namespace mvplayer::renderer {
     case AV_PIX_FMT_YUV420P:
     case AV_PIX_FMT_YUV422P:
     case AV_PIX_FMT_YUV440P:
+    case AV_PIX_FMT_YUV444P:
     case AV_PIX_FMT_YUV420P10LE:
     case AV_PIX_FMT_YUV422P10LE:
     case AV_PIX_FMT_YUV440P10LE:
+    case AV_PIX_FMT_YUV444P10LE:
       return std::make_unique<yuvp::renderer>();
     default:
       return nullptr;
