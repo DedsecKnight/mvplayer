@@ -203,7 +203,9 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     if (!convert_frame(frame, target_format)) {
       spdlog::error("Error converting frame to {}",
                     av_get_pix_fmt_name(target_format));
+      frame_pool_.get().release_frame(frame);
       std::ignore = request_termination();
+      return;
     }
     std::swap(frame, converted_frame_holder_);
     swap_frame = true;
@@ -211,6 +213,8 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
 
   if (!renderer_->render_frame(frame)) {
     spdlog::error("error rendering frame");
+    frame_pool_.get().release_frame(swap_frame ? converted_frame_holder_
+                                               : frame);
     std::ignore = event_handler_t::request_termination();
     return;
   }

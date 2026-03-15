@@ -142,6 +142,7 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
       generate_audio_buffer(frame, event.payload().num_channels);
   if (audio_buffer.empty()) {
     spdlog::error("Error generating audio buffer. Requesting termination...");
+    frame_pool_.get().release_frame(frame);
     std::ignore = request_termination();
     return;
   }
@@ -149,11 +150,15 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
   if (!SDL_PutAudioStreamData(audio_stream_.get(), audio_buffer.data(),
                               static_cast<int32_t>(audio_buffer_size_))) {
     spdlog::error("Error enqueueing audio sample: {}", SDL_GetError());
+    frame_pool_.get().release_frame(frame);
     std::ignore = request_termination();
+    return;
   }
   if (!SDL_FlushAudioStream(audio_stream_.get())) {
     spdlog::error("Error flushing audio stream: {}", SDL_GetError());
+    frame_pool_.get().release_frame(frame);
     std::ignore = request_termination();
+    return;
   }
   playback_state_.expected_frame_no++;
   frame_pool_.get().release_frame(frame);
