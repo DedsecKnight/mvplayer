@@ -3,7 +3,7 @@
 #include <libavutil/pixfmt.h>
 
 #include "renderer/base.hpp"
-#include "texture.hpp"
+#include "renderer/channel_plane.hpp"
 namespace mvplayer::renderer::yuvp {
 class renderer : public base {
  public:
@@ -22,6 +22,6 @@ class renderer : public base {
  private:
   static bool pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept;
 
-  std::array<opengl::texture, 3> plane_textures_;
+  std::array<channel_plane, 3> planes_;
 };
 }  // namespace mvplayer::renderer::yuvp
