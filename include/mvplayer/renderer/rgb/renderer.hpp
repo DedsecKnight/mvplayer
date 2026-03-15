@@ -1,7 +1,7 @@
 #pragma once
 
 #include "renderer/base.hpp"
-#include "texture.hpp"
+#include "renderer/channel_plane.hpp"
 
 namespace mvplayer::renderer::rgb {
 class renderer : public base {
@@ -19,6 +19,6 @@ class renderer : public base {
   ~renderer() override = default;
 
  private:
-  opengl::texture texture_;
+  channel_plane plane_;
 };
 }  // namespace mvplayer::renderer::rgb
