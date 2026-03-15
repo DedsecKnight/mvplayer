@@ -16,12 +16,15 @@ renderer::renderer() : base(vertex_shader_spec{}, fragment_shader_spec{}) {}
       frame->data[0], static_cast<size_t>(frame->linesize[0] * frame->height)};
 
   glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[0] / pixel_size);
-  texture_.configure_texture_data(frame_data_view,
-                                  {.width = frame->width,
-                                   .height = frame->height,
-                                   .internal_format = GL_RGB,
-                                   .format = GL_RGB,
-                                   .data_type = GL_UNSIGNED_BYTE});
+  if (!plane_.load_plane(frame_data_view, {.internal_format = GL_RGB,
+                                           .format = GL_RGB,
+                                           .data_type = GL_UNSIGNED_BYTE,
+                                           .texture_slot = 0,
+                                           .width = frame->width,
+                                           .height = frame->height})) {
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    return false;
+  }
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
   draw_frame();
   return true;
