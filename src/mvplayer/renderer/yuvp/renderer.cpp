@@ -13,7 +13,8 @@ renderer::renderer()
 bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
   return pixel_format == AV_PIX_FMT_YUV420P10LE ||
          pixel_format == AV_PIX_FMT_YUV444P10LE ||
-         pixel_format == AV_PIX_FMT_YUV422P10LE;
+         pixel_format == AV_PIX_FMT_YUV422P10LE ||
+         pixel_format == AV_PIX_FMT_YUV440P10LE;
 }
 
 [[nodiscard]] bool renderer::render_frame(const AVFrame* frame) noexcept {
@@ -22,7 +23,9 @@ bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
                     frame->format == AV_PIX_FMT_YUV422P10LE ||
                     frame->format == AV_PIX_FMT_YUV420P10LE;
   bool half_height = frame->format == AV_PIX_FMT_YUV420P ||
-                     frame->format == AV_PIX_FMT_YUV420P10LE;
+                     frame->format == AV_PIX_FMT_YUV420P10LE ||
+                     frame->format == AV_PIX_FMT_YUV440P ||
+                     frame->format == AV_PIX_FMT_YUV440P10LE;
 
   std::array<int32_t, 3> plane_width{
       frame->width, half_width ? frame->width / 2 : frame->width,
