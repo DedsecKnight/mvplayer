@@ -80,6 +80,7 @@ target_sources(
     src/mvplayer/renderer/rgb/renderer.cpp
     src/mvplayer/renderer/yuvp/renderer.cpp
     src/mvplayer/renderer/factory.cpp
+    src/mvplayer/renderer/channel_plane.cpp
 
   PRIVATE
     FILE_SET vplayerPrivateHeaders
