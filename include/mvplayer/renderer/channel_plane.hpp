@@ -29,7 +29,7 @@ class channel_plane {
  private:
   std::array<opengl::pixel_buffer, 2> pixel_buffer_;
   opengl::texture texture_;
-  uint8_t pb_index_{0};
+  size_t pb_index_{0};
   bool initialized_{false};
 };
 };  // namespace mvplayer::renderer

@@ -8,8 +8,8 @@ namespace mvplayer::renderer {
 
 [[nodiscard]] bool channel_plane::load_plane(
     std::span<uint8_t> plane_data, const plane_data_spec& spec) noexcept {
-  auto read_index = (pb_index_ + 1) % 2;
-  auto write_index = (read_index + 1) % 2;
+  const auto read_index = (pb_index_ ^= 1U);
+  const auto write_index = read_index ^ 1U;
 
   texture_.bind(spec.texture_slot);
 
@@ -34,7 +34,6 @@ namespace mvplayer::renderer {
       .update_pixel(plane_data.data(),
                     static_cast<GLsizeiptr>(plane_data.size()));
 
-  pb_index_ = (pb_index_ + 1) % 2;
   return true;
 }
 
