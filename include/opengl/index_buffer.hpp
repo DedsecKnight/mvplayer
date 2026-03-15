@@ -10,6 +10,7 @@ class index_buffer {
   explicit index_buffer(std::span<const uint32_t> indices);
 
   void bind() const noexcept;
+  [[nodiscard]] GLuint id() const noexcept;
 
   index_buffer(const index_buffer&) = delete;
   index_buffer& operator=(const index_buffer&) = delete;

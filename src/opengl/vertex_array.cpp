@@ -35,6 +35,8 @@ void vertex_array::apply_attribute(const vertex_attribute_spec& attribute) {
   glEnableVertexAttribArray(num_attributes_++);
 }
 
+GLuint vertex_array::id() const noexcept { return id_; }
+
 vertex_array::~vertex_array() { glDeleteVertexArrays(1, &id_); }
 
 void vertex_array::bind() const noexcept {

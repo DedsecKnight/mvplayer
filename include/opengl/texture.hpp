@@ -19,6 +19,7 @@ class texture {
   void configure_texture_data(std::span<uint8_t> pixel_buffer,
                               const texture_spec& spec) noexcept;
   void bind(uint32_t slot = 0) const noexcept;
+  [[nodiscard]] GLuint id() const noexcept;
 
   texture(const texture&) = delete;
   texture& operator=(const texture&) = delete;

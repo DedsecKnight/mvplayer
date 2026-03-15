@@ -44,6 +44,8 @@ void texture::configure_texture_data(std::span<uint8_t> pixel_buffer,
   }
 }
 
+GLuint texture::id() const noexcept { return id_; }
+
 void texture::configure_filtering() const noexcept {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

@@ -28,6 +28,8 @@ vertex_buffer& vertex_buffer::operator=(vertex_buffer&& buffer) noexcept {
   return *this;
 }
 
+GLuint vertex_buffer::id() const noexcept { return id_; }
+
 vertex_buffer::~vertex_buffer() { glDeleteBuffers(1, &id_); }
 
 };  // namespace opengl
