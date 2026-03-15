@@ -40,11 +40,11 @@ class envelope {
   void reply(const event_t& event) const noexcept {
     if (sender_.mailbox_ == nullptr) {
       // TODO: figure out what to do here
-      std::println("No mailbox found");
+      spdlog::error("No mailbox found");
       return;
     }
     if (!sender_.mailbox_->send_event(event)) {
-      std::println("Failed to send event {}", typeid(payload_t).name());
+      spdlog::error("Failed to send event {}", typeid(payload_t).name());
       // TODO: figure out what to do here. retries maybe?
     }
   }
