@@ -7,7 +7,8 @@
 #include "renderer/yuvp/shader_spec.hpp"
 
 namespace mvplayer::renderer::yuvp {
-renderer::renderer() : base(vertex_shader_spec{}, fragment_shader_spec{}) {}
+renderer::renderer()
+    : base(vertex_shader_spec{}, fragment_shader_spec{}), planes_{{}} {}
 
 bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
   return pixel_format == AV_PIX_FMT_YUV420P10LE ||
@@ -45,16 +46,19 @@ bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
     auto pixel_value_size = is_10_bit ? sizeof(uint16_t) : sizeof(uint8_t);
     glPixelStorei(GL_UNPACK_ROW_LENGTH,
                   static_cast<int32_t>(linesize_view[i] / pixel_value_size));
-    plane_textures_.at(i).configure_texture_data(
-        plane_data_view,
-        {.width = plane_width.at(i),
-         .height = plane_height.at(i),
-         .internal_format = is_10_bit ? GL_R16 : GL_RED,
-         .format = GL_RED,
-         .data_type = static_cast<GLenum>(is_10_bit ? GL_UNSIGNED_SHORT
-                                                    : GL_UNSIGNED_BYTE)});
+    if (!planes_.at(i).load_plane(
+            plane_data_view,
+            {.internal_format = is_10_bit ? GL_R16 : GL_RED,
+             .format = GL_RED,
+             .data_type = static_cast<GLenum>(is_10_bit ? GL_UNSIGNED_SHORT
+                                                        : GL_UNSIGNED_BYTE),
+             .texture_slot = static_cast<uint32_t>(i),
+             .width = plane_width.at(i),
+             .height = plane_height.at(i)})) {
+      glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+      return false;
+    }
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    plane_textures_.at(i).bind(i);
   }
   draw_frame();
   return true;
