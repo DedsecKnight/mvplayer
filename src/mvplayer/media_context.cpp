@@ -19,6 +19,7 @@ media_context::media_context(AVFormatContext* format_ctx_ptr, AVStream* stream,
   if (avcodec_parameters_to_context(codec_ctx_ptr_, codec_params_ptr) < 0) {
     throw std::runtime_error{"error initializing codec context from params"};
   }
+  codec_ctx_ptr_->thread_count = 0;
   if (avcodec_open2(codec_ctx_ptr_, codec_ptr_, nullptr) < 0) {
     throw std::runtime_error{"error initializing codec context to use codec"};
   }
@@ -111,7 +112,7 @@ void media_context::flush_codec_context() const noexcept {
   }
 
   avcodec_parameters_free(&ctx_params_ptr);
-
+  codec_ctx_ptr->thread_count = 0;
   if (avcodec_open2(codec_ctx_ptr, ctx.codec_ptr_, nullptr) < 0) {
     avcodec_free_context(&codec_ctx_ptr);
     return nullptr;
