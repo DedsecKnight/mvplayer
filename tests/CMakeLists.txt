@@ -12,5 +12,6 @@ target_sources(test PRIVATE
   mvplayer/media_context_tests.cpp
   mvplayer/info_tests.cpp
   mvplayer/frame_pool_tests.cpp
+  mvplayer/error_tests.cpp
 )
 target_link_libraries(test PRIVATE gtest::gtest multithreaded mvplayer)

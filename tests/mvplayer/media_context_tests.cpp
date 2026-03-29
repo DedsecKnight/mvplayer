@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "error.hpp"
 #include "media_context.hpp"
 
 using mvplayer::media_context;
@@ -52,4 +53,26 @@ TEST(MediaContext, MoveAssignment) {
 
 TEST(MediaContext, DestructorNullContext) {
   { media_context ctx; }
+}
+
+TEST(MediaContext, CreateReturnsExpectedType) {
+  // Verify create() returns std::expected<media_context, error>
+  using result_t =
+      decltype(media_context::create(nullptr, nullptr, nullptr, nullptr));
+  static_assert(
+      std::is_same_v<result_t,
+                     std::expected<media_context, mvplayer::error>>);
+}
+
+TEST(MediaContext, CreateWithInvalidCodecParamsReturnsError) {
+  // avcodec_alloc_context3(nullptr) succeeds but avcodec_parameters_to_context
+  // with empty params fails with an error code
+  AVCodecParameters* params = avcodec_parameters_alloc();
+  auto result = media_context::create(nullptr, nullptr, params, nullptr);
+  avcodec_parameters_free(&params);
+  ASSERT_FALSE(result.has_value());
+  // The error should be either an av_error (from avcodec_open2 failing)
+  // or allocation_error — we just verify it propagates correctly
+  EXPECT_TRUE(std::holds_alternative<mvplayer::av_error>(result.error()) ||
+              std::holds_alternative<mvplayer::allocation_error>(result.error()));
 }
