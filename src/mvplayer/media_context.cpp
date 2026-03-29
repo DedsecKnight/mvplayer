@@ -1,53 +1,24 @@
 #include "media_context.hpp"
 
+#include <libavcodec/avcodec.h>
+
+#include "error.hpp"
+
 extern "C" {
 #include <libavutil/avutil.h>
 #include <libavutil/mathematics.h>
 }
 
 #include <atomic>
-#include <stdexcept>
 
 namespace mvplayer {
 media_context::media_context(AVFormatContext* format_ctx_ptr, AVStream* stream,
-                             AVCodecParameters* codec_params_ptr,
+                             AVCodecContext* codec_ctx_ptr,
                              const AVCodec* codec_ptr)
     : format_ctx_ptr_{format_ctx_ptr},
-      codec_ctx_ptr_{avcodec_alloc_context3(codec_ptr)},
+      codec_ctx_ptr_{codec_ctx_ptr},
       codec_ptr_{codec_ptr},
-      stream_{stream} {
-  if (avcodec_parameters_to_context(codec_ctx_ptr_, codec_params_ptr) < 0) {
-    throw std::runtime_error{"error initializing codec context from params"};
-  }
-  codec_ctx_ptr_->thread_count = 0;
-  if (avcodec_open2(codec_ctx_ptr_, codec_ptr_, nullptr) < 0) {
-    throw std::runtime_error{"error initializing codec context to use codec"};
-  }
-}
-
-media_context::media_context(const media_context& ctx)
-    : format_ctx_ptr_{ctx.format_ctx_ptr_},
-      codec_ctx_ptr_{initialize_codec_context(ctx)},
-      codec_ptr_{ctx.codec_ptr_},
-      stream_{ctx.stream_} {
-  if (codec_ctx_ptr_ == nullptr) {
-    throw std::runtime_error{"error copying codec context"};
-  }
-}
-
-media_context& media_context::operator=(const media_context& ctx) {
-  if (this == &ctx) {
-    return *this;
-  }
-  format_ctx_ptr_ = ctx.format_ctx_ptr_;
-  codec_ptr_ = ctx.codec_ptr_;
-  codec_ctx_ptr_ = initialize_codec_context(ctx);
-  stream_ = ctx.stream_;
-  if (codec_ctx_ptr_ == nullptr) {
-    throw std::runtime_error{"error copying codec context"};
-  }
-  return *this;
-}
+      stream_{stream} {}
 
 media_context::media_context(media_context&& ctx) noexcept {
   std::swap(ctx.format_ctx_ptr_, format_ctx_ptr_);
@@ -86,37 +57,26 @@ void media_context::flush_codec_context() const noexcept {
   avcodec_flush_buffers(codec_ctx_ptr_);
 }
 
-[[nodiscard]] AVCodecContext* media_context::initialize_codec_context(
-    const media_context& ctx) noexcept {
-  AVCodecContext* codec_ctx_ptr = avcodec_alloc_context3(ctx.codec_ptr_);
+[[nodiscard]] std::expected<media_context, error> media_context::create(
+    AVFormatContext* format_ctx_ptr, AVStream* stream,
+    AVCodecParameters* codec_params_ptr, const AVCodec* codec_ptr) noexcept {
+  auto* codec_ctx_ptr = avcodec_alloc_context3(codec_ptr);
+
   if (codec_ctx_ptr == nullptr) {
-    return nullptr;
+    return std::unexpected(
+        allocation_error{.context = "avcodec_alloc_context3"});
   }
-
-  AVCodecParameters* ctx_params_ptr = avcodec_parameters_alloc();
-  if (ctx_params_ptr == nullptr) {
-    avcodec_free_context(&codec_ctx_ptr);
-    return nullptr;
+  if (auto ret = avcodec_parameters_to_context(codec_ctx_ptr, codec_params_ptr);
+      ret < 0) {
+    return std::unexpected(
+        av_error{.code = ret, .context = "avcodec_parameters_to_context"});
   }
-
-  if (avcodec_parameters_from_context(ctx_params_ptr, ctx.codec_ctx_ptr_) < 0) {
-    avcodec_parameters_free(&ctx_params_ptr);
-    avcodec_free_context(&codec_ctx_ptr);
-    return nullptr;
-  }
-
-  if (avcodec_parameters_to_context(codec_ctx_ptr, ctx_params_ptr) < 0) {
-    avcodec_parameters_free(&ctx_params_ptr);
-    avcodec_free_context(&codec_ctx_ptr);
-    return nullptr;
-  }
-
-  avcodec_parameters_free(&ctx_params_ptr);
   codec_ctx_ptr->thread_count = 0;
-  if (avcodec_open2(codec_ctx_ptr, ctx.codec_ptr_, nullptr) < 0) {
-    avcodec_free_context(&codec_ctx_ptr);
-    return nullptr;
+
+  if (auto ret = avcodec_open2(codec_ctx_ptr, codec_ptr, nullptr); ret < 0) {
+    return std::unexpected(av_error{.code = ret, .context = "avcodec_open2"});
   }
-  return codec_ctx_ptr;
+
+  return media_context{format_ctx_ptr, stream, codec_ctx_ptr, codec_ptr};
 }
 }  // namespace mvplayer

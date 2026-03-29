@@ -109,8 +109,12 @@ std::expected<video_info, error> video_reader::load_video(
     AVCodecParameters* codec_params_ptr = (*video_stream_it)->codecpar;
     const AVCodec* frame_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
-    frame_ctx_ = media_context{format_context_ptr_, (*video_stream_it),
-                               codec_params_ptr, frame_codec};
+    auto frame_ctx_res = media_context::create(
+        format_context_ptr_, (*video_stream_it), codec_params_ptr, frame_codec);
+    if (!frame_ctx_res.has_value()) {
+      return std::unexpected(frame_ctx_res.error());
+    }
+    frame_ctx_ = std::move(frame_ctx_res.value());
 
     picture_info.format = frame_ctx_.codec().long_name;
     picture_info.fps = (*video_stream_it)->avg_frame_rate;
@@ -127,8 +131,13 @@ std::expected<video_info, error> video_reader::load_video(
     AVCodecParameters* codec_params_ptr = (*audio_stream_it)->codecpar;
     const AVCodec* audio_codec =
         avcodec_find_decoder(codec_params_ptr->codec_id);
-    audio_ctx_ = media_context{format_context_ptr_, (*audio_stream_it),
-                               codec_params_ptr, audio_codec};
+    auto audio_ctx_res = media_context::create(
+        format_context_ptr_, (*audio_stream_it), codec_params_ptr, audio_codec);
+    if (!audio_ctx_res.has_value()) {
+      return std::unexpected(audio_ctx_res.error());
+    }
+    audio_ctx_ = std::move(audio_ctx_res.value());
+
     std::string_view audio_format_name{
         av_get_sample_fmt_name(audio_ctx_.codec_ctx().sample_fmt)};
     spdlog::info("Audio format name: {}", audio_format_name);
