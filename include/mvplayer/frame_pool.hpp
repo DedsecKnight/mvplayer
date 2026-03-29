@@ -1,5 +1,6 @@
 #pragma once
 
+#include "error.hpp"
 #include "utils/owned.hpp"
 
 extern "C" {
@@ -22,7 +23,7 @@ class frame_pool {
 
   ~frame_pool() = default;
 
-  [[nodiscard]] std::expected<AVFrame*, int32_t> get_frame(
+  [[nodiscard]] std::expected<AVFrame*, error> get_frame(
       AVCodecContext* codec_ctx_ptr) noexcept;
 
   void release_frame(AVFrame* frame) noexcept;

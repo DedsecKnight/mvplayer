@@ -33,7 +33,7 @@ void video_reader::on_startup(std::span<char* const> args) noexcept {
 
   auto video_info = load_video(input_filename);
   if (!video_info.has_value()) {
-    spdlog::error("Unable to load video");
+    spdlog::error("Unable to load video: {}", video_info.error());
     std::ignore = request_termination();
     return;
   }
@@ -68,7 +68,7 @@ void video_reader::handle_termination_signal() noexcept {
   }
 }
 
-std::optional<video_info> video_reader::load_video(
+std::expected<video_info, error> video_reader::load_video(
     const std::filesystem::path& filename) noexcept {
   if (format_context_ptr_ != nullptr) {
     // In case there's already a video loaded, we unload the current video
@@ -76,34 +76,35 @@ std::optional<video_info> video_reader::load_video(
     avformat_close_input(&format_context_ptr_);
   }
   spdlog::info("Reading video file: {}", filename.filename().string());
-  if (avformat_open_input(&format_context_ptr_, filename.string().c_str(),
-                          nullptr, nullptr) != 0) {
-    spdlog::error("Error reading video file {}", filename.filename().string());
-    return std::nullopt;
+  if (auto ret = avformat_open_input(
+          &format_context_ptr_, filename.string().c_str(), nullptr, nullptr);
+      ret != 0) {
+    return std::unexpected(video_file_load_error{
+        .filename = filename.filename().string(), .err_msg = av_err2str(ret)});
   }
 
-  auto streams = get_media_streams();
-  if (streams.empty()) {
-    spdlog::error("Error finding stream information for {}",
-                  filename.filename().string());
-    return std::nullopt;
+  auto streams_res = get_media_streams();
+  if (!streams_res.has_value()) {
+    return std::unexpected(streams_res.error());
   }
 
-  auto video_stream_it = std::ranges::find_if(streams, [](AVStream* stream) {
-    return stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO;
-  });
+  auto video_stream_it =
+      std::ranges::find_if(streams_res.value(), [](AVStream* stream) {
+        return stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO;
+      });
 
-  auto audio_stream_it = std::ranges::find_if(streams, [](AVStream* stream) {
-    return stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO;
-  });
+  auto audio_stream_it =
+      std::ranges::find_if(streams_res.value(), [](AVStream* stream) {
+        return stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO;
+      });
 
   picture_info picture_info{};
   audio_info audio_info{};
 
-  if (video_stream_it == streams.end()) {
-    spdlog::error("Unable to detect video stream for {}",
-                  filename.filename().string());
-    return std::nullopt;
+  if (video_stream_it == streams_res.value().end()) {
+    return std::unexpected(
+        video_file_load_error{.filename = filename.filename().string(),
+                              .err_msg = "unable to detect video stream"});
   } else {
     AVCodecParameters* codec_params_ptr = (*video_stream_it)->codecpar;
     const AVCodec* frame_codec =
@@ -118,7 +119,7 @@ std::optional<video_info> video_reader::load_video(
     picture_info.height = (*video_stream_it)->codecpar->height;
   }
 
-  if (audio_stream_it == streams.end()) {
+  if (audio_stream_it == streams_res.value().end()) {
     spdlog::info("Unable to detect audio stream for {}",
                  filename.filename().string());
     audio_info.has_audio_stream = false;
@@ -141,14 +142,17 @@ std::optional<video_info> video_reader::load_video(
     audio_info.has_audio_stream = true;
   }
 
-  return std::optional<video_info>{std::in_place,
-                                   format_context_ptr_->iformat->long_name,
-                                   picture_info, audio_info};
+  return video_info{.codec_name = format_context_ptr_->iformat->long_name,
+                    .picture = picture_info,
+                    .audio = audio_info};
 }
 
-std::span<AVStream*> video_reader::get_media_streams() const noexcept {
-  if (avformat_find_stream_info(format_context_ptr_, nullptr) < 0) {
-    return {};
+std::expected<std::span<AVStream*>, error> video_reader::get_media_streams()
+    const noexcept {
+  if (auto ret = avformat_find_stream_info(format_context_ptr_, nullptr);
+      ret < 0) {
+    return std::unexpected(
+        av_error{.code = ret, .context = "avformat_find_stream_info"});
   }
 
   return std::span<AVStream*>{
@@ -283,7 +287,8 @@ void video_reader::decode_video() {
       auto frame_result =
           frame_pools_.at(context_index).get().get_frame(&codec_ctx);
       if (!frame_result.has_value()) {
-        if (frame_result.error() == AVERROR(EAGAIN)) {
+        const auto* av_err = std::get_if<av_error>(&frame_result.error());
+        if (av_err != nullptr && av_err->code == AVERROR(EAGAIN)) {
           break;
         } else {
           spdlog::critical(

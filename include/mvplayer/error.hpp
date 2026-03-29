@@ -49,9 +49,19 @@ struct audio_processing_error {
   }
 };
 
+struct video_file_load_error {
+  std::string filename;
+  std::string err_msg;
+
+  auto format(fmt::format_context& ctx) const noexcept {
+    return fmt::format_to(ctx.out(), "failed to read video file {}: {}",
+                          filename, err_msg);
+  }
+};
+
 using error =
     std::variant<allocation_error, av_error, mismatch_sample_written_error,
-                 audio_processing_error>;
+                 audio_processing_error, video_file_load_error>;
 
 }  // namespace mvplayer
 

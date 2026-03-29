@@ -22,7 +22,7 @@ frame_pool::frame_pool(size_t pool_size)
   }
 }
 
-[[nodiscard]] std::expected<AVFrame*, int32_t> frame_pool::get_frame(
+[[nodiscard]] std::expected<AVFrame*, error> frame_pool::get_frame(
     AVCodecContext* codec_ctx_ptr) noexcept {
   AVFrame* frame{nullptr};
   bool pop_required = true;
@@ -48,7 +48,8 @@ frame_pool::frame_pool(size_t pool_size)
     if (!pop_required) {
       free_frames_.push_back(frame);
     }
-    return std::unexpected(AVERROR(EAGAIN));
+    return std::unexpected(
+        av_error{.code = AVERROR(EAGAIN), .context = "avcodec_receive_frame"});
   }
 
   if (pop_required) {

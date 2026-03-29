@@ -3,7 +3,6 @@
 #include <array>
 #include <atomic>
 #include <filesystem>
-#include <optional>
 #include <span>
 
 #include "events.hpp"
@@ -52,7 +51,7 @@ class video_reader
 
   void handle_termination_signal() noexcept override;
 
-  [[nodiscard]] std::optional<video_info> load_video(
+  [[nodiscard]] std::expected<video_info, error> load_video(
       const std::filesystem::path& filename) noexcept;
   void operator()(
       [[maybe_unused]] const playback_toggled_event& event) override {
@@ -63,7 +62,8 @@ class video_reader
   void on_startup(std::span<char* const> args) noexcept;
 
  private:
-  [[nodiscard]] std::span<AVStream*> get_media_streams() const noexcept;
+  [[nodiscard]] std::expected<std::span<AVStream*>, error> get_media_streams()
+      const noexcept;
   [[nodiscard]] int64_t next_seek_request() noexcept;
   [[nodiscard]] seek_result process_seek_request() noexcept;
 
