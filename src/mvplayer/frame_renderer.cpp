@@ -86,8 +86,6 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   spdlog::info("Initialized OpenGL with version {}.{}",
                GLAD_VERSION_MAJOR(gl_version), GLAD_VERSION_MINOR(gl_version));
 
-  initialize_viewport(width_, height_);
-
   if (converted_frame_holder_ != nullptr) {
     av_freep(static_cast<void*>(&converted_frame_holder_->data[0]));
     av_frame_free(&converted_frame_holder_);
@@ -99,12 +97,11 @@ void frame_renderer::operator()(const new_video_loaded_event& event) {
   spdlog::trace("SDL Texture created successfully");
 }
 
-void frame_renderer::initialize_viewport(int32_t width,
-                                         int32_t height) const noexcept {
+void frame_renderer::update_viewport() const noexcept {
   int32_t screen_width{};
   int32_t screen_height{};
   SDL_GetWindowSize(window_.get(), &screen_width, &screen_height);
-  float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
+  float aspect_ratio = static_cast<float>(width_) / static_cast<float>(height_);
 
   int32_t scaled_width = screen_width;
   auto scaled_height = static_cast<int32_t>(lround(
@@ -268,6 +265,10 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
             .count());
     spdlog::trace("Slept for {}ms", wait_time.count());
   }
+
+  // NOTE: this function is invoked every frame to ensure that frame fits nicely
+  // when window size changes
+  update_viewport();
 
   SDL_GL_SwapWindow(window_.get());
 

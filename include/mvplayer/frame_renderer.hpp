@@ -117,7 +117,7 @@ class frame_renderer
       AVFrame* frame, AVPixelFormat target_format) noexcept;
   [[nodiscard]] std::expected<void, error> initialize_converted_frame_holder(
       AVFrame* frame, AVPixelFormat target_format) noexcept;
-  void initialize_viewport(int32_t width, int32_t height) const noexcept;
+  void update_viewport() const noexcept;
 
   sdl_window window_{nullptr};
   sdl_gl_context context_{nullptr};
