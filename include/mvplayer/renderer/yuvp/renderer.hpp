@@ -17,7 +17,8 @@ class renderer : public base {
 
   ~renderer() override = default;
 
-  [[nodiscard]] bool render_frame(const AVFrame* frame) noexcept override;
+  [[nodiscard]] std::expected<void, error> render_frame(
+      const AVFrame* frame) noexcept override;
 
  private:
   static bool pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept;

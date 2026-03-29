@@ -1,5 +1,8 @@
 #pragma once
 
+#include <expected>
+
+#include "error.hpp"
 #include "pixel_buffer.hpp"
 #include "texture.hpp"
 namespace mvplayer::renderer {
@@ -23,8 +26,8 @@ class channel_plane {
 
   ~channel_plane() = default;
 
-  [[nodiscard]] bool load_plane(std::span<uint8_t> plane_data,
-                                const plane_data_spec& spec) noexcept;
+  [[nodiscard]] std::expected<void, error> load_plane(
+      std::span<uint8_t> plane_data, const plane_data_spec& spec) noexcept;
 
  private:
   std::array<opengl::pixel_buffer, 2> pixel_buffer_;

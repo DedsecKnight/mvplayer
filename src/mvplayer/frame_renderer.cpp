@@ -216,8 +216,8 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
     swap_frame = true;
   }
 
-  if (!renderer_->render_frame(frame)) {
-    spdlog::error("error rendering frame");
+  if (auto res = renderer_->render_frame(frame); !res.has_value()) {
+    spdlog::error("error rendering frame: {}", res.error());
     frame_pool_.get().release_frame(swap_frame ? converted_frame_holder_
                                                : frame);
     std::ignore = event_handler_t::request_termination();

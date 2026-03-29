@@ -2,6 +2,7 @@
 
 #include <fmt/base.h>
 #include <fmt/format.h>
+#include <glad/gl.h>
 extern "C" {
 #include <libavutil/error.h>
 }
@@ -9,6 +10,15 @@ extern "C" {
 #include <string_view>
 #include <variant>
 namespace mvplayer {
+
+#define GL_INVOKE(x, ctx)                                                    \
+  {                                                                          \
+    while (glGetError() != GL_NO_ERROR);                                     \
+    x;                                                                       \
+    if (auto error = glGetError()) {                                         \
+      return std::unexpected(opengl_error{.context = (ctx), .code = error}); \
+    }                                                                        \
+  }
 
 struct allocation_error {
   std::string_view context;
@@ -59,9 +69,45 @@ struct video_file_load_error {
   }
 };
 
+struct opengl_error {
+  std::string_view context;
+  GLenum code;
+  auto format(fmt::format_context& ctx) const noexcept {
+    std::string_view err_msg;
+    switch (code) {
+      case GL_INVALID_ENUM:
+        err_msg = "invalid enum";
+        break;
+      case GL_INVALID_VALUE:
+        err_msg = "invalid value";
+        break;
+      case GL_INVALID_OPERATION:
+        err_msg = "invalid operation";
+        break;
+      case GL_STACK_OVERFLOW:
+        err_msg = "stack overflow";
+        break;
+      case GL_STACK_UNDERFLOW:
+        err_msg = "stack underflow";
+        break;
+      case GL_OUT_OF_MEMORY:
+        err_msg = "out of memory";
+        break;
+      case GL_INVALID_FRAMEBUFFER_OPERATION:
+        err_msg = "invalid framebuffer operation";
+        break;
+      default:
+        err_msg = "unknown error";
+        break;
+    }
+    return fmt::format_to(ctx.out(), "opengl error at {}: {}", context,
+                          err_msg);
+  }
+};
+
 using error =
     std::variant<allocation_error, av_error, mismatch_sample_written_error,
-                 audio_processing_error, video_file_load_error>;
+                 audio_processing_error, video_file_load_error, opengl_error>;
 
 }  // namespace mvplayer
 

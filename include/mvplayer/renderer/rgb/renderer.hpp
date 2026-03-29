@@ -14,7 +14,8 @@ class renderer : public base {
   renderer(renderer&&) noexcept = default;
   renderer& operator=(renderer&&) noexcept = default;
 
-  [[nodiscard]] bool render_frame(const AVFrame* frame) noexcept override;
+  [[nodiscard]] std::expected<void, error> render_frame(
+      const AVFrame* frame) noexcept override;
 
   ~renderer() override = default;
 

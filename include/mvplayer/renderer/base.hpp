@@ -1,5 +1,6 @@
 #pragma once
 
+#include "error.hpp"
 #include "index_buffer.hpp"
 #include "shader.hpp"
 #include "vertex_array.hpp"
@@ -35,7 +36,8 @@ class base {
   base(base&&) noexcept = default;
   base& operator=(base&&) noexcept = default;
 
-  [[nodiscard]] virtual bool render_frame(const AVFrame* frame) noexcept = 0;
+  [[nodiscard]] virtual std::expected<void, error> render_frame(
+      const AVFrame* frame) noexcept = 0;
 
   virtual ~base() = default;
   void load_shaders() const noexcept;

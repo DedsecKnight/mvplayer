@@ -17,7 +17,8 @@ bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
          pixel_format == AV_PIX_FMT_YUV440P10LE;
 }
 
-[[nodiscard]] bool renderer::render_frame(const AVFrame* frame) noexcept {
+[[nodiscard]] std::expected<void, error> renderer::render_frame(
+    const AVFrame* frame) noexcept {
   bool half_width = frame->format == AV_PIX_FMT_YUV420P ||
                     frame->format == AV_PIX_FMT_YUV422P ||
                     frame->format == AV_PIX_FMT_YUV422P10LE ||
@@ -38,18 +39,21 @@ bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
 
   bool is_10_bit = pix_fmt_is_10bit(static_cast<AVPixelFormat>(frame->format));
   const auto multiplier = is_10_bit ? 64.0F : 1.0F;
-  glProgramUniform1f(shader_.id(),
-                     glGetUniformLocation(shader_.id(), "multiplier"),
-                     multiplier);
+  GL_INVOKE(glProgramUniform1f(shader_.id(),
+                               glGetUniformLocation(shader_.id(), "multiplier"),
+                               multiplier),
+            "set multiplier uniform value for yuvp");
 
   for (auto i{3UZ}; i-- > 0;) {
     std::span<uint8_t> plane_data_view{
         plane_view[i],
         static_cast<size_t>(plane_height.at(i) * linesize_view[i])};
     auto pixel_value_size = is_10_bit ? sizeof(uint16_t) : sizeof(uint8_t);
-    glPixelStorei(GL_UNPACK_ROW_LENGTH,
-                  static_cast<int32_t>(linesize_view[i] / pixel_value_size));
-    if (!planes_.at(i).load_plane(
+    GL_INVOKE(glPixelStorei(
+                  GL_UNPACK_ROW_LENGTH,
+                  static_cast<int32_t>(linesize_view[i] / pixel_value_size)),
+              "set GL_UNPACK_ROW_LENGTH for yuvp");
+    if (auto res = planes_.at(i).load_plane(
             plane_data_view,
             {.internal_format = is_10_bit ? GL_R16 : GL_RED,
              .format = GL_RED,
@@ -57,13 +61,16 @@ bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
                                                         : GL_UNSIGNED_BYTE),
              .texture_slot = static_cast<uint32_t>(i),
              .width = plane_width.at(i),
-             .height = plane_height.at(i)})) {
-      glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-      return false;
+             .height = plane_height.at(i)});
+        !res.has_value()) {
+      GL_INVOKE(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0),
+                "reset GL_UNPACK_ROW_LENGTH for yuvp");
+      return std::unexpected(res.error());
     }
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    GL_INVOKE(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0),
+              "reset GL_UNPACK_ROW_LENGTH for yuvp");
   }
   draw_frame();
-  return true;
+  return {};
 }
 }  // namespace mvplayer::renderer::yuvp
