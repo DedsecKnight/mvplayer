@@ -120,31 +120,37 @@ void frame_renderer::initialize_viewport(int32_t width,
              scaled_height);
 }
 
-bool frame_renderer::initialize_converted_frame_holder(
+[[nodiscard]] std::expected<void, error>
+frame_renderer::initialize_converted_frame_holder(
     AVFrame* frame, AVPixelFormat target_format) noexcept {
   converted_frame_holder_ = av_frame_alloc();
   if (converted_frame_holder_ == nullptr) {
-    return false;
+    return std::unexpected(
+        allocation_error{.context = "initialize_converted_frame_holder"});
   }
-  if (av_image_alloc(static_cast<uint8_t**>(converted_frame_holder_->data),
-                     static_cast<int32_t*>(converted_frame_holder_->linesize),
-                     frame->width, frame->height, target_format,
-                     FRAME_ALLOC_ALIGNMENT) < 0) {
+  if (auto ret = av_image_alloc(
+          static_cast<uint8_t**>(converted_frame_holder_->data),
+          static_cast<int32_t*>(converted_frame_holder_->linesize),
+          frame->width, frame->height, target_format, FRAME_ALLOC_ALIGNMENT);
+      ret < 0) {
     av_frame_free(&converted_frame_holder_);
-    return false;
+    return std::unexpected(
+        av_error{.code = ret, .context = "initialize_converted_frame_holder"});
   }
   converted_frame_holder_->width = frame->width;
   converted_frame_holder_->height = frame->height;
   converted_frame_holder_->format = target_format;
 
-  return true;
+  return {};
 }
 
-bool frame_renderer::convert_frame(AVFrame* frame,
-                                   AVPixelFormat target_format) noexcept {
-  if (converted_frame_holder_ == nullptr &&
-      !initialize_converted_frame_holder(frame, target_format)) {
-    return false;
+[[nodiscard]] std::expected<void, error> frame_renderer::convert_frame(
+    AVFrame* frame, AVPixelFormat target_format) noexcept {
+  if (converted_frame_holder_ == nullptr) {
+    auto init_result = initialize_converted_frame_holder(frame, target_format);
+    if (!init_result.has_value()) {
+      return std::unexpected(init_result.error());
+    }
   }
 
   converted_frame_holder_->pts = frame->pts;
@@ -163,7 +169,7 @@ bool frame_renderer::convert_frame(AVFrame* frame,
             static_cast<uint8_t**>(converted_frame_holder_->data),
             static_cast<int32_t*>(converted_frame_holder_->linesize));
 
-  return true;
+  return {};
 }
 
 void frame_renderer::operator()(const new_frame_loaded_event& event) {
@@ -200,9 +206,11 @@ void frame_renderer::operator()(const new_frame_loaded_event& event) {
 
   bool swap_frame = false;
   if (frame->format != target_format) {
-    if (!convert_frame(frame, target_format)) {
-      spdlog::error("Error converting frame to {}",
-                    av_get_pix_fmt_name(target_format));
+    auto frame_conversion_result = convert_frame(frame, target_format);
+    if (!frame_conversion_result.has_value()) {
+      spdlog::error("Error converting frame to {}: {}",
+                    av_get_pix_fmt_name(target_format),
+                    frame_conversion_result.error());
       frame_pool_.get().release_frame(frame);
       std::ignore = request_termination();
       return;

@@ -4,6 +4,7 @@
 #include <SDL3/SDL_video.h>
 #include <libavutil/pixfmt.h>
 
+#include "error.hpp"
 #include "processor/pre_event_handler.hpp"
 
 extern "C" {
@@ -112,9 +113,10 @@ class frame_renderer
   ~frame_renderer() noexcept override;
 
  private:
-  bool convert_frame(AVFrame* frame, AVPixelFormat target_format) noexcept;
-  bool initialize_converted_frame_holder(AVFrame* frame,
-                                         AVPixelFormat target_format) noexcept;
+  [[nodiscard]] std::expected<void, error> convert_frame(
+      AVFrame* frame, AVPixelFormat target_format) noexcept;
+  [[nodiscard]] std::expected<void, error> initialize_converted_frame_holder(
+      AVFrame* frame, AVPixelFormat target_format) noexcept;
   void initialize_viewport(int32_t width, int32_t height) const noexcept;
 
   sdl_window window_{nullptr};
