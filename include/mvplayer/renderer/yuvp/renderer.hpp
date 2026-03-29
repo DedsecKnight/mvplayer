@@ -5,6 +5,7 @@
 #include "renderer/base.hpp"
 #include "renderer/channel_plane.hpp"
 namespace mvplayer::renderer::yuvp {
+
 class renderer : public base {
  public:
   renderer();
@@ -22,6 +23,9 @@ class renderer : public base {
 
  private:
   static bool pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept;
+  std::expected<void, error> update_plane_data(
+      size_t plane_index, std::span<uint8_t> plane_data,
+      int32_t unpack_row_length, const plane_data_spec& spec) noexcept;
 
   std::array<channel_plane, 3> planes_;
 };

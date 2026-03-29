@@ -48,29 +48,42 @@ bool renderer::pix_fmt_is_10bit(AVPixelFormat pixel_format) noexcept {
     std::span<uint8_t> plane_data_view{
         plane_view[i],
         static_cast<size_t>(plane_height.at(i) * linesize_view[i])};
-    auto pixel_value_size = is_10_bit ? sizeof(uint16_t) : sizeof(uint8_t);
-    GL_INVOKE(glPixelStorei(
-                  GL_UNPACK_ROW_LENGTH,
-                  static_cast<int32_t>(linesize_view[i] / pixel_value_size)),
-              "set GL_UNPACK_ROW_LENGTH for yuvp");
-    if (auto res = planes_.at(i).load_plane(
-            plane_data_view,
-            {.internal_format = is_10_bit ? GL_R16 : GL_RED,
-             .format = GL_RED,
-             .data_type = static_cast<GLenum>(is_10_bit ? GL_UNSIGNED_SHORT
-                                                        : GL_UNSIGNED_BYTE),
-             .texture_slot = static_cast<uint32_t>(i),
-             .width = plane_width.at(i),
-             .height = plane_height.at(i)});
-        !res.has_value()) {
-      GL_INVOKE(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0),
-                "reset GL_UNPACK_ROW_LENGTH for yuvp");
+    const auto pixel_value_size =
+        is_10_bit ? sizeof(uint16_t) : sizeof(uint8_t);
+    const auto unpack_row_length =
+        static_cast<int32_t>(linesize_view[i] / pixel_value_size);
+
+    auto res = update_plane_data(
+        i, plane_data_view, unpack_row_length,
+
+        {.internal_format = is_10_bit ? GL_R16 : GL_RED,
+         .format = GL_RED,
+         .data_type = static_cast<GLenum>(is_10_bit ? GL_UNSIGNED_SHORT
+                                                    : GL_UNSIGNED_BYTE),
+         .texture_slot = static_cast<uint32_t>(i),
+         .width = plane_width.at(i),
+         .height = plane_height.at(i)});
+    if (!res.has_value()) {
       return std::unexpected(res.error());
     }
-    GL_INVOKE(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0),
-              "reset GL_UNPACK_ROW_LENGTH for yuvp");
   }
   draw_frame();
+  return {};
+}
+
+std::expected<void, error> renderer::update_plane_data(
+    size_t plane_index, std::span<uint8_t> plane_data,
+    int32_t unpack_row_length, const plane_data_spec& spec) noexcept {
+  GL_INVOKE(glPixelStorei(GL_UNPACK_ROW_LENGTH, unpack_row_length),
+            "set GL_UNPACK_ROW_LENGTH for yuvp");
+  if (auto res = planes_.at(plane_index).load_plane(plane_data, spec);
+      !res.has_value()) {
+    GL_INVOKE(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0),
+              "reset GL_UNPACK_ROW_LENGTH for yuvp");
+    return std::unexpected(res.error());
+  }
+  GL_INVOKE(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0),
+            "reset GL_UNPACK_ROW_LENGTH for yuvp");
   return {};
 }
 }  // namespace mvplayer::renderer::yuvp
