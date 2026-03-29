@@ -1,8 +1,11 @@
 #include "audio_renderer.hpp"
 
 #include <SDL3/SDL_audio.h>
+#include <SDL3/SDL_error.h>
 #include <SDL3/SDL_timer.h>
 #include <spdlog/spdlog.h>
+
+#include "error.hpp"
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -28,13 +31,13 @@ audio_renderer& audio_renderer::operator=(audio_renderer&& renderer) noexcept {
   return *this;
 }
 
-bool audio_renderer::initialize_swr_context(
+[[nodiscard]] std::expected<void, error> audio_renderer::initialize_swr_context(
     AVSampleFormat input_fmt, AVSampleFormat output_fmt) noexcept {
   resample_context_ = swr_alloc();
 
   if (resample_context_ == nullptr) {
-    spdlog::error("Error creating SwrContext");
-    return false;
+    return std::unexpected(
+        allocation_error{.context = "initialize_swr_context"});
   }
 
   av_opt_set_chlayout(resample_context_, "in_chlayout", channel_layout_ptr_, 0);
@@ -47,17 +50,17 @@ bool audio_renderer::initialize_swr_context(
   av_opt_set_sample_fmt(resample_context_, "in_sample_fmt", input_fmt, 0);
   av_opt_set_sample_fmt(resample_context_, "out_sample_fmt", output_fmt, 0);
 
-  if (swr_init(resample_context_) < 0) {
-    spdlog::error("Error initializing SwrContext");
+  if (auto ret = swr_init(resample_context_); ret < 0) {
     swr_free(&resample_context_);
-    return false;
+    return std::unexpected(av_error{.code = ret, .context = "swr_init"});
   }
 
-  return true;
+  return {};
 }
 
-[[nodiscard]] std::span<uint8_t> audio_renderer::generate_non_planar_sample(
-    AVFrame* frame, int32_t num_channels) noexcept {
+[[nodiscard]] std::expected<std::span<uint8_t>, error>
+audio_renderer::generate_non_planar_sample(AVFrame* frame,
+                                           int32_t num_channels) noexcept {
   const auto input_format = static_cast<AVSampleFormat>(frame->format);
   const auto num_samples = frame->nb_samples;
   const auto sample_size =
@@ -66,15 +69,17 @@ bool audio_renderer::initialize_swr_context(
   return std::span<uint8_t>{frame->data[0], audio_buffer_size_};
 }
 
-[[nodiscard]] std::span<uint8_t> audio_renderer::generate_packed_planar_sample(
-    AVFrame* frame, int32_t num_channels) noexcept {
+[[nodiscard]] std::expected<std::span<uint8_t>, error>
+audio_renderer::generate_packed_planar_sample(AVFrame* frame,
+                                              int32_t num_channels) noexcept {
   const auto input_fmt = static_cast<AVSampleFormat>(frame->format);
   const auto output_fmt = av_get_packed_sample_fmt(input_fmt);
 
-  if (resample_context_ == nullptr &&
-      !initialize_swr_context(input_fmt, output_fmt)) {
-    spdlog::error("Error initializing swresample context");
-    return std::span<uint8_t>{};
+  if (resample_context_ == nullptr) {
+    auto swr_ctx_init_ret = initialize_swr_context(input_fmt, output_fmt);
+    if (!swr_ctx_init_ret.has_value()) {
+      return std::unexpected(swr_ctx_init_ret.error());
+    }
   }
 
   const auto out_sample_size = av_get_bytes_per_sample(output_fmt);
@@ -90,8 +95,8 @@ bool audio_renderer::initialize_swr_context(
                          frame->nb_samples, output_fmt, 0);
 
     if (ret < 0) {
-      spdlog::error("Error allocating samples");
-      return std::span<uint8_t>{};
+      return std::unexpected(
+          av_error{.code = ret, .context = "av_samples_alloc"});
     }
 
     max_num_samples_ = frame->nb_samples;
@@ -102,21 +107,25 @@ bool audio_renderer::initialize_swr_context(
       static_cast<const uint8_t* const*>(frame->data), frame->nb_samples);
 
   if (num_samples_written < 0) {
-    spdlog::error("Error writing samples");
-    return std::span<uint8_t>{};
+    return std::unexpected(
+        av_error{.code = num_samples_written, .context = "swr_convert"});
   }
 
   if (num_samples_written != frame->nb_samples) {
     spdlog::error("Expected to write {} samples. Only {} samples are written",
                   frame->nb_samples, num_samples_written);
-    return std::span<uint8_t>{};
+    return std::unexpected(
+        mismatch_sample_written_error{.context = "swr_convert",
+                                      .expected = frame->nb_samples,
+                                      .actual = num_samples_written});
   }
 
   return std::span<uint8_t>{av_sample_buffer_[0], audio_buffer_size_};
 }
 
-[[nodiscard]] std::span<uint8_t> audio_renderer::generate_audio_buffer(
-    AVFrame* frame, int32_t num_channels) noexcept {
+[[nodiscard]] std::expected<std::span<uint8_t>, error>
+audio_renderer::generate_audio_buffer(AVFrame* frame,
+                                      int32_t num_channels) noexcept {
   const auto audio_format = static_cast<AVSampleFormat>(frame->format);
   if (av_sample_fmt_is_planar(audio_format) == 1) {
     return generate_packed_planar_sample(frame, num_channels);
@@ -138,24 +147,25 @@ void audio_renderer::operator()(const new_audio_samples_loaded_event& event) {
   }
 
   auto* frame = event.payload().frame;
-  const auto audio_buffer =
-      generate_audio_buffer(frame, event.payload().num_channels);
-  if (audio_buffer.empty()) {
-    spdlog::error("Error generating audio buffer. Requesting termination...");
-    frame_pool_.get().release_frame(frame);
-    std::ignore = request_termination();
-    return;
-  }
-
-  if (!SDL_PutAudioStreamData(audio_stream_.get(), audio_buffer.data(),
-                              static_cast<int32_t>(audio_buffer_size_))) {
-    spdlog::error("Error enqueueing audio sample: {}", SDL_GetError());
-    frame_pool_.get().release_frame(frame);
-    std::ignore = request_termination();
-    return;
-  }
-  if (!SDL_FlushAudioStream(audio_stream_.get())) {
-    spdlog::error("Error flushing audio stream: {}", SDL_GetError());
+  const auto load_audio_result =
+      generate_audio_buffer(frame, event.payload().num_channels)
+          .and_then([this](std::span<uint8_t> audio_buffer)
+                        -> std::expected<void, error> {
+            if (!SDL_PutAudioStreamData(
+                    audio_stream_.get(), audio_buffer.data(),
+                    static_cast<int32_t>(audio_buffer_size_))) {
+              return std::unexpected(audio_processing_error{
+                  .context = "SDL_PutAudioStreamData", .msg = SDL_GetError()});
+            }
+            if (!SDL_FlushAudioStream(audio_stream_.get())) {
+              return std::unexpected(audio_processing_error{
+                  .context = "SDL_FlushAudioStream", .msg = SDL_GetError()});
+            }
+            return {};
+          });
+  if (!load_audio_result.has_value()) {
+    spdlog::error("Error loading audio sample: {}. Requesting termination...",
+                  load_audio_result.error());
     frame_pool_.get().release_frame(frame);
     std::ignore = request_termination();
     return;

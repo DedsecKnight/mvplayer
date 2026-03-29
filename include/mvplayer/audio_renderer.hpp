@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_audio.h>
 
+#include "error.hpp"
 #include "frame_pool.hpp"
 
 extern "C" {
@@ -64,15 +65,15 @@ class audio_renderer
   ~audio_renderer() noexcept override;
 
  private:
-  [[nodiscard]] std::span<uint8_t> generate_audio_buffer(
+  [[nodiscard]] std::expected<std::span<uint8_t>, error> generate_audio_buffer(
       AVFrame* frame, int32_t num_channels) noexcept;
-  [[nodiscard]] std::span<uint8_t> generate_packed_planar_sample(
-      AVFrame* frame, int32_t num_channels) noexcept;
-  [[nodiscard]] std::span<uint8_t> generate_non_planar_sample(
-      AVFrame* frame, int32_t num_channels) noexcept;
+  [[nodiscard]] std::expected<std::span<uint8_t>, error>
+  generate_packed_planar_sample(AVFrame* frame, int32_t num_channels) noexcept;
+  [[nodiscard]] std::expected<std::span<uint8_t>, error>
+  generate_non_planar_sample(AVFrame* frame, int32_t num_channels) noexcept;
 
-  [[nodiscard]] bool initialize_swr_context(AVSampleFormat input_fmt,
-                                            AVSampleFormat output_fmt) noexcept;
+  [[nodiscard]] std::expected<void, error> initialize_swr_context(
+      AVSampleFormat input_fmt, AVSampleFormat output_fmt) noexcept;
 
   std::vector<uint8_t*> av_sample_buffer_{nullptr};
   AVChannelLayout* channel_layout_ptr_{nullptr};

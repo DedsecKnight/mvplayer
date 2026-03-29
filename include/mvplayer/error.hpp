@@ -6,22 +6,21 @@ extern "C" {
 #include <libavutil/error.h>
 }
 
-#include <string>
 #include <string_view>
 #include <variant>
 namespace mvplayer {
 
 struct allocation_error {
-  std::string context;
+  std::string_view context;
 
   auto format(fmt::format_context& ctx) const noexcept {
-    return fmt::format_to(ctx.out(), "ffmpeg allocation error at {}", context);
+    return fmt::format_to(ctx.out(), "allocation error at {}", context);
   }
 };
 
 struct av_error {
   int32_t code;
-  std::string context;
+  std::string_view context;
 
   auto format(fmt::format_context& ctx) const noexcept {
     return fmt::format_to(ctx.out(), "averror at {}: {}", context,
@@ -29,7 +28,30 @@ struct av_error {
   }
 };
 
-using error = std::variant<allocation_error, av_error>;
+struct mismatch_sample_written_error {
+  std::string_view context;
+  int32_t expected, actual;
+
+  auto format(fmt::format_context& ctx) const noexcept {
+    return fmt::format_to(ctx.out(),
+                          "[{}]: expected {} to be written, but {} found",
+                          context, expected, actual);
+  }
+};
+
+struct audio_processing_error {
+  std::string_view context;
+  std::string msg;
+
+  auto format(fmt::format_context& ctx) const noexcept {
+    return fmt::format_to(ctx.out(), "failed to process audio at {}: {}",
+                          context, msg);
+  }
+};
+
+using error =
+    std::variant<allocation_error, av_error, mismatch_sample_written_error,
+                 audio_processing_error>;
 
 }  // namespace mvplayer
 
