@@ -175,6 +175,7 @@ std::expected<std::span<AVStream*>, error> video_reader::get_media_streams()
   // NOTE: Here, we do a CAS operation to make sure that we got the most
   // updated seek request
   while (!seek_request_.compare_exchange_weak(next_seek_request, -1,
+                                              std::memory_order_release,
                                               std::memory_order_relaxed)) {
   }
   return next_seek_request;
@@ -233,12 +234,13 @@ void video_reader::operator()(const seek_request_event& event) {
       av_rescale_q(frame_ctx_.most_recent_pts(), timebase,
                    AVRational{.num = 1, .den = AV_TIME_BASE});
 
-  int64_t curr_seek_pos = seek_request_.load(std::memory_order_relaxed);
+  int64_t curr_seek_pos = seek_request_.load(std::memory_order_acquire);
   int64_t new_seek_pos = std::clamp<int64_t>(
       (curr_seek_pos == -1 ? most_recent_pts_ts : curr_seek_pos) + delta_pts,
       0L, format_context_ptr_->duration);
 
   while (!seek_request_.compare_exchange_weak(curr_seek_pos, new_seek_pos,
+                                              std::memory_order_release,
                                               std::memory_order_relaxed)) {
     most_recent_pts_ts =
         av_rescale_q(frame_ctx_.most_recent_pts(), timebase,
