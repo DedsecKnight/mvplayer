@@ -11,6 +11,11 @@ extern "C" {
 
 #include "utils/queue.hpp"
 namespace mvplayer {
+struct frame_data {
+  AVFrame* frame;
+  bool requires_unref;
+};
+
 class frame_pool {
  public:
   explicit frame_pool(size_t pool_size = 3);
@@ -29,7 +34,7 @@ class frame_pool {
   void release_frame(AVFrame* frame) noexcept;
 
  private:
-  multithreaded::utils::spsc_queue<AVFrame*> frame_queue_;
+  multithreaded::utils::spsc_queue<frame_data> frame_queue_;
   std::vector<av_frame> frame_owner_;
   std::vector<AVFrame*> free_frames_;
   size_t capacity_;

@@ -24,11 +24,11 @@ frame_pool::frame_pool(size_t pool_size)
 
 [[nodiscard]] std::expected<AVFrame*, error> frame_pool::get_frame(
     AVCodecContext* codec_ctx_ptr) noexcept {
-  AVFrame* frame{nullptr};
+  frame_data frame{.frame = nullptr, .requires_unref = false};
   bool pop_required = true;
 
   if (!free_frames_.empty()) {
-    frame = free_frames_.back();
+    frame.frame = free_frames_.back();
   } else if (!frame_queue_.pop(frame)) {
     spdlog::info(
         "[frame-pool] Ran out of frame. Increase capacity from {} to {}",
@@ -39,14 +39,18 @@ frame_pool::frame_pool(size_t pool_size)
     }
     capacity_ *= 2;
 
-    frame = free_frames_.back();
+    frame.frame = free_frames_.back();
   } else {
     pop_required = false;
   }
 
-  if (avcodec_receive_frame(codec_ctx_ptr, frame) == AVERROR(EAGAIN)) {
+  if (frame.requires_unref) {
+    av_frame_unref(frame.frame);
+  }
+
+  if (avcodec_receive_frame(codec_ctx_ptr, frame.frame) == AVERROR(EAGAIN)) {
     if (!pop_required) {
-      free_frames_.push_back(frame);
+      free_frames_.push_back(frame.frame);
     }
     return std::unexpected(
         av_error{.code = AVERROR(EAGAIN), .context = "avcodec_receive_frame"});
@@ -55,15 +59,14 @@ frame_pool::frame_pool(size_t pool_size)
   if (pop_required) {
     free_frames_.pop_back();
   }
-  return frame;
+  return frame.frame;
 }
 
 void frame_pool::release_frame(AVFrame* frame) noexcept {
-  av_frame_unref(frame);
-  if (!frame_queue_.push(frame)) [[unlikely]] {
+  if (!frame_queue_.emplace(frame, true)) [[unlikely]] {
     spdlog::critical(
         "[frame-pool] Frame pool buffer queue is full. Trying again...");
-    while (!frame_queue_.push(frame)) {
+    while (!frame_queue_.emplace(frame, true)) {
     }
   }
 }
