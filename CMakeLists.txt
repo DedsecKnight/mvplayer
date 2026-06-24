@@ -8,6 +8,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(ENABLE_ASAN "Enable Address Sanitizer" OFF)
 option(ENABLE_UBSAN "Enable Undefined Behavior Sanitizer" OFF)
 
+if(ENABLE_TSAN)
+  set(SANITIZER_FLAGS "-fsanitize=thread -fno-omit-frame-pointer -g")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_FLAGS}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SANITIZER_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SANITIZER_FLAGS}")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${SANITIZER_FLAGS}")
+
+  message(STATUS "Thread Sanitizer Sanitizer enabled")
+endif()
+
 if(ENABLE_ASAN)
   set(SANITIZER_FLAGS "-fsanitize=address -fno-omit-frame-pointer -g")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_FLAGS}")
